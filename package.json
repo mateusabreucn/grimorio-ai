@@ -1,0 +1,24 @@
+{
+  "name": "grimorio-ai",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@9.0.0",
+  "scripts": {
+    "dev:web": "pnpm --filter web dev",
+    "dev:rag": "cd apps/rag-service && uvicorn main:app --reload --port 8000",
+    "build": "pnpm --filter web build",
+    "test": "pnpm --filter web test && cd apps/rag-service && pytest",
+    "test:web": "pnpm --filter web test",
+    "test:rag": "cd apps/rag-service && pytest",
+    "db:generate": "pnpm --filter web db:generate",
+    "db:migrate": "pnpm --filter web db:migrate",
+    "db:studio": "pnpm --filter web db:studio",
+    "rag:ingest": "cd apps/rag-service && python scripts/ingest_books.py",
+    "lint": "pnpm --filter web lint",
+    "type-check": "pnpm --filter web type-check"
+  },
+  "workspaces": [
+    "apps/web",
+    "packages/*"
+  ]
+}
