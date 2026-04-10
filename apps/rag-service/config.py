@@ -24,7 +24,8 @@ class Settings(BaseSettings):
     chunk_overlap: int = 100
     top_k: int = 5
     similarity_threshold: float = 0.3
-    embedding_model: str = "models/text-embedding-004"
+    embedding_model: str = "models/gemini-embedding-001"
+    embedding_dimensions: int = 768
 
 
 settings = Settings()
