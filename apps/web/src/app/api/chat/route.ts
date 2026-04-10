@@ -58,61 +58,72 @@ export async function POST(req: Request) {
   const userId = session?.user?.id ?? null;
   const lastUserMessage = [...clientMessages].reverse().find((m) => m.role === "user");
 
+  // StreamData envia o conversationId ao cliente para redirect após salvar
   const streamData = new StreamData();
 
-  const result = await streamText({
-    model: googleAI("gemini-2.5-flash"),
-    system: GRIMORIO_SYSTEM_PROMPT,
-    messages: clientMessages,
-    // Permite até 5 chamadas à tool por resposta (para queries abrangentes)
-    maxSteps: 5,
-    tools: {
-      buscar_livros: tool({
-        description:
-          "Busca trechos relevantes nos livros de RPG. " +
-          "Para perguntas abrangentes (ex: listar todas as classes), faça múltiplas buscas com termos diferentes.",
-        parameters: z.object({
-          query: z.string().describe("Termos de busca específicos e objetivos"),
+  let result;
+  try {
+    result = await streamText({
+      model: googleAI("gemini-2.5-flash"),
+      system: GRIMORIO_SYSTEM_PROMPT,
+      messages: clientMessages,
+      maxSteps: 5,
+      tools: {
+        buscar_livros: tool({
+          description:
+            "Busca trechos relevantes nos livros de RPG. " +
+            "Para perguntas abrangentes, faça múltiplas buscas com termos diferentes.",
+          parameters: z.object({
+            query: z.string().describe("Termos de busca específicos e objetivos"),
+          }),
+          execute: async ({ query }) => {
+            try {
+              const chunks = await searchChunks(query, 8);
+              return buildRagContext(chunks);
+            } catch {
+              return "Não foi possível buscar nos livros agora. Responda com o que sabe.";
+            }
+          },
         }),
-        execute: async ({ query }) => {
-          const chunks = await searchChunks(query, 8);
-          return buildRagContext(chunks);
-        },
-      }),
-    },
-    onFinish: async ({ text }) => {
-      if (userId && lastUserMessage) {
+      },
+      onFinish: async ({ text }) => {
         try {
-          let convId = conversationId;
+          if (userId && lastUserMessage) {
+            let convId = conversationId;
 
-          if (!convId) {
-            const title = lastUserMessage.content.slice(0, 60);
-            const [newConv] = await db
-              .insert(conversations)
-              .values({ userId, title })
-              .returning({ id: conversations.id });
-            convId = newConv.id;
+            if (!convId) {
+              const title = lastUserMessage.content.slice(0, 60);
+              const [newConv] = await db
+                .insert(conversations)
+                .values({ userId, title })
+                .returning({ id: conversations.id });
+              convId = newConv.id;
+            }
+
+            await db.insert(messages).values([
+              { conversationId: convId, role: "user", content: lastUserMessage.content },
+              { conversationId: convId, role: "assistant", content: text },
+            ]);
+
+            await db
+              .update(conversations)
+              .set({ updatedAt: new Date() })
+              .where(eq(conversations.id, convId));
+
+            streamData.append({ conversationId: convId });
           }
-
-          await db.insert(messages).values([
-            { conversationId: convId, role: "user", content: lastUserMessage.content },
-            { conversationId: convId, role: "assistant", content: text },
-          ]);
-
-          await db
-            .update(conversations)
-            .set({ updatedAt: new Date() })
-            .where(eq(conversations.id, convId));
-
-          streamData.append({ conversationId: convId });
         } catch (err) {
-          console.error("[chat] Erro ao salvar mensagens:", err);
+          console.error("[chat] Erro ao salvar:", err);
+        } finally {
+          streamData.close();
         }
-      }
+      },
+    });
+  } catch (err) {
+    streamData.close();
+    console.error("[chat] Erro no streamText:", err);
+    return new Response("Erro interno ao processar mensagem.", { status: 500 });
+  }
 
-      streamData.close();
-    },
-  });
-
-  return result.toAIStreamResponse({ data: streamData });
+  return result.toDataStreamResponse({ data: streamData });
 }
