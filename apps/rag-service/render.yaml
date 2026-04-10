@@ -4,14 +4,16 @@ services:
     runtime: python
     plan: free
     buildCommand: pip install -r requirements.txt
-    startCommand: uvicorn main:app --host 0.0.0.0 --port 8000
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
     envVars:
       - key: DATABASE_URL
         scope: build,runtime
       - key: GOOGLE_AI_API_KEY
         scope: runtime
+        sync: false
       - key: RAG_INTERNAL_SECRET
         scope: runtime
+        sync: false
       - key: CHUNK_SIZE
         value: "800"
       - key: CHUNK_OVERLAP
