@@ -8,12 +8,12 @@ export default auth((req) => {
   const { pathname } = req.nextUrl
   const isLoggedIn = !!req.auth
 
-  const isProtectedRoute =
-    pathname.startsWith("/chat") || pathname.startsWith("/journal")
+  // /journal requer auth — /chat é público (sem login: sem histórico)
+  const isJournalRoute = pathname.startsWith("/journal")
   const isAuthRoute =
     pathname.startsWith("/login") || pathname.startsWith("/register")
 
-  if (isProtectedRoute && !isLoggedIn) {
+  if (isJournalRoute && !isLoggedIn) {
     return NextResponse.redirect(new URL("/login", req.url))
   }
 

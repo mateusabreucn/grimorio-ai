@@ -6,8 +6,11 @@ const envSchema = z.object({
   NEXTAUTH_URL: z.string().url().optional(),
   GOOGLE_CLIENT_ID: z.string().optional(),
   GOOGLE_CLIENT_SECRET: z.string().optional(),
-  RAG_SERVICE_URL: z.string().url().optional(),
-  RAG_INTERNAL_SECRET: z.string().min(32).optional(),
+  GOOGLE_AI_API_KEY: z.string().min(1, "GOOGLE_AI_API_KEY é obrigatória"),
+  RAG_SERVICE_URL: z.string().url("RAG_SERVICE_URL inválida"),
+  RAG_INTERNAL_SECRET: z.string().min(32, "RAG_INTERNAL_SECRET deve ter pelo menos 32 caracteres"),
+  UPSTASH_REDIS_REST_URL: z.string().url().optional(),
+  UPSTASH_REDIS_REST_TOKEN: z.string().optional(),
 })
 
 const parsed = envSchema.safeParse(process.env)
