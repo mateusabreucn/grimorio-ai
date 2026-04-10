@@ -8,7 +8,7 @@ services:
     envVars:
       - key: DATABASE_URL
         scope: build,runtime
-      - key: GOOGLE_AI_API_KEY
+      - key: VOYAGE_API_KEY
         scope: runtime
         sync: false
       - key: RAG_INTERNAL_SECRET
@@ -21,4 +21,4 @@ services:
       - key: TOP_K
         value: "5"
       - key: EMBEDDING_MODEL
-        value: "models/text-embedding-004"
+        value: "voyage-4"

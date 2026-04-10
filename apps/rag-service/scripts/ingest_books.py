@@ -4,7 +4,7 @@
 Execute a partir da pasta rag-service:
     python scripts/ingest_books.py
 
-Requer .env com DATABASE_URL e GOOGLE_AI_API_KEY configurados.
+Requer .env com DATABASE_URL e VOYAGE_API_KEY configurados.
 """
 
 import asyncio

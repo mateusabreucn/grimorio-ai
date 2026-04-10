@@ -16,10 +16,10 @@ class Settings(BaseSettings):
     # Autenticação interna
     rag_internal_secret: str
 
-    # Ollama (embeddings locais)
-    ollama_base_url: str = "http://localhost:11434"
-    embedding_model: str = "qwen3-embedding"
-    embedding_dimensions: int = 4096
+    # Voyage AI (embeddings)
+    voyage_api_key: str
+    embedding_model: str = "voyage-4"
+    embedding_dimensions: int = 1024
 
     # Configurações RAG
     chunk_size: int = 800

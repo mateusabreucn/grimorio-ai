@@ -20,7 +20,7 @@ async def search(
     Busca chunks relevantes dos livros via embeddings vetoriais.
 
     Fluxo:
-    1. Gera embedding da query com Google AI (task_type=retrieval_query)
+    1. Gera embedding da query via Voyage AI (input_type=query)
     2. Busca chunks similares no pgvector por cosine similarity
     3. Retorna top-K chunks ordenados por relevância
     """

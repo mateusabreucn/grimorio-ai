@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 import pdfplumber
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
+from config import settings
 from services import embeddings as embeddings_service
 from services import vector_store
 
@@ -103,15 +104,30 @@ async def ingest_pdf(
         return 0
 
     logger.info("Iniciando ingestão de %d chunks para '%s'...", len(chunks), book_title)
+
+    # voyage-4: lista plana de textos, API batch interno cuida do paging
+    chunk_texts = [chunk["content"] for chunk in chunks]
+
+    logger.info(
+        "Gerando embeddings via Voyage AI (%s) para '%s' (%d chunks)...",
+        settings.embedding_model, book_title, len(chunks),
+    )
+    try:
+        embeddings = await embeddings_service.embed_documents_batch(chunk_texts)
+    except Exception as exc:
+        logger.error("Falha ao gerar embeddings para '%s': %s", book_title, exc)
+        raise
+
+    if len(embeddings) != len(chunks):
+        raise ValueError(
+            f"Mismatch: {len(chunks)} chunks mas {len(embeddings)} embeddings retornados"
+        )
+
+    logger.info("Embeddings gerados. Salvando no banco...")
     saved = 0
 
-    for i, chunk in enumerate(chunks):
+    for i, (chunk, embedding) in enumerate(zip(chunks, embeddings)):
         try:
-            embedding = await embeddings_service.embed_text(
-                chunk["content"],
-                task_type="retrieval_document",
-            )
-
             await asyncio.to_thread(
                 vector_store.save_chunk_sync,
                 conn,
@@ -126,10 +142,10 @@ async def ingest_pdf(
             saved += 1
 
             if (i + 1) % batch_size == 0:
-                logger.info("  Progresso: %d/%d chunks", i + 1, len(chunks))
+                logger.info("  Progresso: %d/%d chunks salvos", i + 1, len(chunks))
 
         except Exception as exc:
-            logger.error("Erro no chunk %d de '%s': %s", i, book_title, exc)
+            logger.error("Erro ao salvar chunk %d de '%s': %s", i, book_title, exc)
             # Continua os demais chunks mesmo em caso de falha
 
     logger.info("✅ '%s' concluído: %d/%d chunks salvos", book_title, saved, len(chunks))
