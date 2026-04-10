@@ -16,7 +16,7 @@ Extração de texto (pdfplumber)
       ↓
 Chunking (800 tokens, overlap 100)
       ↓
-Embeddings (text-embedding-004 Google)
+Embeddings em batch por livro (voyage-context-3, input_type="document")
       ↓
 Armazenamento no PostgreSQL (pgvector)
 
@@ -47,8 +47,10 @@ CHUNK_SIZE = 800        # tokens aproximados por chunk
 CHUNK_OVERLAP = 100     # tokens de sobreposição entre chunks
 
 # Embeddings
-EMBEDDING_MODEL = "models/text-embedding-004"
-EMBEDDING_DIMENSIONS = 768
+EMBEDDING_MODEL = "voyage-4"
+EMBEDDING_DIMENSIONS = 1024
+# Ingestão: input_type="document", batches de até 128 chunks por chamada
+# Runtime:  input_type="query", chamada individual por query do usuário
 
 # Retrieval
 TOP_K = 5               # número de chunks retornados por busca
@@ -265,7 +267,7 @@ services:
     envVars:
       - key: DATABASE_URL
         sync: false
-      - key: GOOGLE_AI_API_KEY
+      - key: VOYAGE_API_KEY
         sync: false
       - key: RAG_INTERNAL_SECRET
         sync: false

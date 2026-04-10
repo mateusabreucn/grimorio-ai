@@ -8,7 +8,7 @@
 ## STATUS ATUAL
 
 ```
-FASE ATIVA: 2 — RAG Service
+FASE ATIVA: 3 — Chat com IA
 PROGRESSO:  [ ] Não iniciado
 ```
 
@@ -67,7 +67,7 @@ apps/web/
 ## FASE 2 — RAG Service e Ingestão dos PDFs
 **Estimativa:** Dia 2-3  
 **Quem faz:** Claude Code (Haiku 4.5 para setup FastAPI, Opus/Sonnet para pipeline RAG)  
-**Status:** `[ ] Pronto para começar`
+**Status:** `[x] Concluído ✅`
 
 ### Pré-requisito
 Fase 1 concluída. PDFs dos quatro livros disponíveis em 
@@ -125,7 +125,7 @@ apps/rag-service/
 ## FASE 3 — Chat com IA (coração do projeto)
 **Estimativa:** Dia 3-4  
 **Quem faz:** Claude Code (Sonnet 4.6)  
-**Status:** `[ ] Bloqueado — aguarda Fase 2`
+**Status:** `[ ] Pronto para começar`
 
 ### Pré-requisito
 Fase 2 concluída. RAG service respondendo em produção.

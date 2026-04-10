@@ -53,22 +53,24 @@ apps/rag-service/
 ## CONFIGURAÇÃO (config.py)
 
 ```python
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
+    model_config = SettingsConfigDict(env_file=".env", case_sensitive=False, extra="ignore")
+
     database_url: str
-    google_ai_api_key: str
     rag_internal_secret: str
-    
+
+    # Voyage AI (embeddings)
+    voyage_api_key: str
+    embedding_model: str = "voyage-4"
+    embedding_dimensions: int = 1024
+
     # Configurações do RAG
     chunk_size: int = 800
     chunk_overlap: int = 100
     top_k: int = 5
     similarity_threshold: float = 0.3
-    embedding_model: str = "models/text-embedding-004"
-    
-    class Config:
-        env_file = ".env"
 
 settings = Settings()
 ```
@@ -123,16 +125,12 @@ def get_db():
 fastapi==0.115.0
 uvicorn[standard]==0.32.0
 pydantic==2.10.0
-pydantic-settings==2.6.0
-google-generativeai==0.8.0
-langchain==0.3.0
-langchain-google-genai==2.0.0
+pydantic-settings==2.6.1
+voyageai>=0.3.2
 langchain-text-splitters==0.3.0
 pdfplumber==0.11.0
-pgvector==0.3.5
 psycopg2-binary==2.9.10
 python-dotenv==1.0.1
-httpx==0.27.0
 pytest==8.3.0
 pytest-asyncio==0.24.0
 ```

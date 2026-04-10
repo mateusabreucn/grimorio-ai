@@ -114,14 +114,14 @@ grimorio-ai/
 - **ORM:** Drizzle ORM (TypeScript-first, zero magic)
 - **Migrations:** `drizzle-kit` — SEMPRE gere migration ao mudar schema
 - **Conexão:** pool via `@neondatabase/serverless` ou `postgres` (Supabase)
-- **Vetores:** extensão `pgvector` — tabela `document_chunks` com `embedding vector(1536)`
+- **Vetores:** extensão `pgvector` — tabela `document_chunks` com `embedding vector(1024)`
 
 Tabelas principais:
 - `users` — id, name, email, password_hash, provider, created_at
 - `conversations` — id, user_id, title, created_at, updated_at
 - `messages` — id, conversation_id, role, content, created_at
 - `journal_entries` — id, user_id, title, content, session_date, created_at
-- `document_chunks` — id, book_id, content, metadata, embedding vector(1536)
+- `document_chunks` — id, book_id, content, metadata, embedding vector(1024)
 
 ---
 
@@ -145,10 +145,9 @@ bcryptjs          → hash de senhas
 ### RAG Service (`apps/rag-service`)
 ```
 fastapi           → API framework
-langchain         → RAG pipeline
-langchain-google-genai → Gemini embeddings + LLM
-pypdf2 / pdfplumber → extração de texto dos PDFs
-pgvector          → client pgvector Python
+langchain-text-splitters → chunking de texto
+voyageai          → Voyage AI embeddings (voyage-4, 1024 dims)
+pdfplumber        → extração de texto dos PDFs
 psycopg2-binary   → PostgreSQL driver
 python-dotenv     → variáveis de ambiente
 pydantic          → validação de dados
