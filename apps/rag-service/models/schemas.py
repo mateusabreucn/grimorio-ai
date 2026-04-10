@@ -3,41 +3,34 @@
 from pydantic import BaseModel, Field
 
 
-class SearchQuery(BaseModel):
+class SearchRequest(BaseModel):
     """Schema para requisição de busca."""
 
-    query: str = Field(
-        ...,
-        min_length=1,
-        max_length=1000,
-        description="Pergunta ou query de busca",
-    )
+    query: str = Field(..., min_length=1, max_length=2000)
+    book_id: str | None = None   # None = busca em todos os livros
+    top_k: int = Field(default=5, ge=1, le=10)
 
 
-class DocumentChunk(BaseModel):
-    """Schema para um chunk de documento retornado."""
+class ChunkResult(BaseModel):
+    """Chunk de documento retornado pela busca."""
 
-    model_config = {"from_attributes": True}
-
-    id: str
+    content: str
     book_id: str
     book_title: str
-    content: str
-    page_number: int | None = None
+    page_number: int | None
     chunk_index: int
-    similarity_score: float = Field(ge=0.0, le=1.0)
+    similarity_score: float
 
 
 class SearchResponse(BaseModel):
-    """Schema para resposta de busca."""
+    """Resposta da busca vetorial."""
 
     query: str
-    chunks: list[DocumentChunk]
-    total_chunks: int
+    chunks: list[ChunkResult]
 
 
 class HealthResponse(BaseModel):
-    """Schema para health check."""
+    """Resposta do health check."""
 
     status: str
     database: str

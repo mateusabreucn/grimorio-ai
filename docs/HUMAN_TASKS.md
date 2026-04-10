@@ -26,7 +26,7 @@ CREATE EXTENSION IF NOT EXISTS "vector";
 -- Executar após ingestão dos PDFs
 CREATE INDEX ON document_chunks 
 USING ivfflat (embedding vector_cosine_ops) 
-WITH (lists = 32);
+WITH (lists = 64);
 ```
 
 ### Ingestão dos PDFs (você executa o script)
