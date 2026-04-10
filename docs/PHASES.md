@@ -8,7 +8,7 @@
 ## STATUS ATUAL
 
 ```
-FASE ATIVA: 1 — Fundação
+FASE ATIVA: 2 — RAG Service
 PROGRESSO:  [ ] Não iniciado
 ```
 
@@ -17,7 +17,7 @@ PROGRESSO:  [ ] Não iniciado
 ## FASE 1 — Fundação e Infraestrutura
 **Estimativa:** Dia 1-2  
 **Quem faz:** Claude Code (Sonnet 4.6) com supervisão humana nas configs de infra  
-**Status:** `[em andamento]`
+**Status:** `[x] Concluído ✅`
 
 ### Objetivos
 - [ ] Setup do monorepo com pnpm workspaces
@@ -66,8 +66,8 @@ apps/web/
 
 ## FASE 2 — RAG Service e Ingestão dos PDFs
 **Estimativa:** Dia 2-3  
-**Quem faz:** Claude Code (Sonnet 4.6 ou Opus 4.6 para pipeline RAG)  
-**Status:** `[ ] Bloqueado — aguarda Fase 1`
+**Quem faz:** Claude Code (Haiku 4.5 para setup FastAPI, Opus/Sonnet para pipeline RAG)  
+**Status:** `[ ] Pronto para começar`
 
 ### Pré-requisito
 Fase 1 concluída. PDFs dos quatro livros disponíveis em 
