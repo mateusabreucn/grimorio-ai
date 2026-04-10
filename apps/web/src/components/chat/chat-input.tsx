@@ -70,9 +70,6 @@ export function ChatInput({
           <span className="sr-only">Enviar</span>
         </Button>
       </form>
-      <p className="text-center text-[10px] text-muted-foreground/40 mt-2">
-        Shift+Enter para nova linha
-      </p>
     </div>
   )
 }
