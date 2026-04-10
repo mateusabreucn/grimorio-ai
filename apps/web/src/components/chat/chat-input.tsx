@@ -23,7 +23,6 @@ export function ChatInput({
 }: ChatInputProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
-  // Auto-resize do textarea
   useEffect(() => {
     const el = textareaRef.current
     if (!el) return
@@ -32,7 +31,6 @@ export function ChatInput({
   }, [input])
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
-    // Enter sem Shift envia; Shift+Enter quebra linha
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault()
       if (!isLoading && input.trim()) {
@@ -42,37 +40,39 @@ export function ChatInput({
   }
 
   return (
-    <form
-      onSubmit={onSubmit}
-      className="flex items-end gap-2 border-t bg-background px-4 py-3"
-    >
-      <Textarea
-        ref={textareaRef}
-        value={input}
-        onChange={onInputChange}
-        onKeyDown={handleKeyDown}
-        placeholder={placeholder}
-        rows={1}
-        disabled={isLoading}
-        className={cn(
-          "resize-none min-h-[44px] max-h-[200px] flex-1",
-          "rounded-xl border-muted-foreground/20 focus-visible:ring-primary/50",
-          "py-2.5 px-3 text-sm leading-relaxed",
-        )}
-      />
-      <Button
-        type="submit"
-        size="icon"
-        disabled={isLoading || !input.trim()}
-        className="shrink-0 h-11 w-11 rounded-xl"
-      >
-        {isLoading ? (
-          <Loader2 className="h-4 w-4 animate-spin" />
-        ) : (
-          <SendHorizontal className="h-4 w-4" />
-        )}
-        <span className="sr-only">Enviar</span>
-      </Button>
-    </form>
+    <div className="border-t bg-background/80 backdrop-blur-sm px-4 py-3">
+      <form onSubmit={onSubmit} className="flex items-end gap-2 max-w-3xl mx-auto">
+        <Textarea
+          ref={textareaRef}
+          value={input}
+          onChange={onInputChange}
+          onKeyDown={handleKeyDown}
+          placeholder={placeholder}
+          rows={1}
+          disabled={isLoading}
+          className={cn(
+            "resize-none min-h-[46px] max-h-[200px] flex-1",
+            "rounded-xl border-border/60 bg-card focus-visible:ring-primary/30",
+            "py-3 px-4 text-sm leading-relaxed",
+          )}
+        />
+        <Button
+          type="submit"
+          size="icon"
+          disabled={isLoading || !input.trim()}
+          className="shrink-0 h-[46px] w-[46px] rounded-xl bg-primary hover:bg-primary/90"
+        >
+          {isLoading ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <SendHorizontal className="h-4 w-4" />
+          )}
+          <span className="sr-only">Enviar</span>
+        </Button>
+      </form>
+      <p className="text-center text-[10px] text-muted-foreground/40 mt-2">
+        Shift+Enter para nova linha
+      </p>
+    </div>
   )
 }
