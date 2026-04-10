@@ -16,7 +16,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from config import settings  # noqa: E402
-from dependencies import init_db_pool, close_db_pool, _pool  # noqa: E402
+from dependencies import init_db_pool, close_db_pool, get_connection, return_connection  # noqa: E402
 from services.ingest import ingest_pdf  # noqa: E402
 from services.vector_store import chunk_count_sync  # noqa: E402
 
@@ -70,11 +70,11 @@ async def ingest_all(skip_existing: bool = True) -> None:
                 continue
 
             # Pega uma conexão para checar se o livro já foi ingerido
-            conn = _pool.getconn()
+            conn = get_connection()
             try:
                 existing = chunk_count_sync(conn, book_id=book["id"])
             finally:
-                _pool.putconn(conn)
+                return_connection(conn)
 
             if skip_existing and existing > 0:
                 logger.info(
@@ -89,7 +89,7 @@ async def ingest_all(skip_existing: bool = True) -> None:
             logger.info("Arquivo  : %s", pdf_path.name)
             logger.info("=" * 60)
 
-            conn = _pool.getconn()
+            conn = get_connection()
             try:
                 saved = await ingest_pdf(
                     conn=conn,
@@ -99,7 +99,7 @@ async def ingest_all(skip_existing: bool = True) -> None:
                 )
                 total_saved += saved
             finally:
-                _pool.putconn(conn)
+                return_connection(conn)
 
         logger.info("")
         logger.info("Ingestão concluída! Total de chunks salvos: %d", total_saved)

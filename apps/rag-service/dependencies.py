@@ -30,6 +30,19 @@ def close_db_pool() -> None:
         _pool.closeall()
 
 
+def get_connection():
+    """Obtém uma conexão do pool (uso fora do FastAPI, ex: scripts)."""
+    if not _pool:
+        raise RuntimeError("Database pool not initialized — call init_db_pool() first")
+    return _pool.getconn()
+
+
+def return_connection(conn) -> None:
+    """Devolve uma conexão ao pool (uso fora do FastAPI, ex: scripts)."""
+    if _pool:
+        _pool.putconn(conn)
+
+
 def get_db() -> Generator:
     """Dependency para obter conexão do pool."""
     if not _pool:
