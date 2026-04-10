@@ -18,9 +18,11 @@ async def health_check(conn=Depends(get_db)) -> HealthResponse:
     # Testa conexão com banco
     try:
         cursor = conn.cursor()
-        cursor.execute("SELECT 1")
-        cursor.close()
-        db_status = "ok"
+        try:
+            cursor.execute("SELECT 1")
+            db_status = "ok"
+        finally:
+            cursor.close()
     except psycopg2.Error:
         db_status = "error"
 

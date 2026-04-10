@@ -17,6 +17,8 @@ class SearchQuery(BaseModel):
 class DocumentChunk(BaseModel):
     """Schema para um chunk de documento retornado."""
 
+    model_config = {"from_attributes": True}
+
     id: str
     book_id: str
     book_title: str
@@ -24,9 +26,6 @@ class DocumentChunk(BaseModel):
     page_number: int | None = None
     chunk_index: int
     similarity_score: float = Field(ge=0.0, le=1.0)
-
-    class Config:
-        from_attributes = True
 
 
 class SearchResponse(BaseModel):

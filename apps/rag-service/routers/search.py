@@ -3,7 +3,7 @@
 from fastapi import APIRouter, Depends
 
 from dependencies import verify_internal_secret, get_db
-from models.schemas import SearchQuery, SearchResponse, DocumentChunk
+from models.schemas import SearchQuery, SearchResponse
 
 router = APIRouter(tags=["search"])
 

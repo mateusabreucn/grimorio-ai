@@ -1,8 +1,14 @@
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
     """Configurações do RAG Service via variáveis de ambiente."""
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        case_sensitive=False,
+        extra="ignore",
+    )
 
     # Banco de dados
     database_url: str
@@ -19,10 +25,6 @@ class Settings(BaseSettings):
     top_k: int = 5
     similarity_threshold: float = 0.3
     embedding_model: str = "models/text-embedding-004"
-
-    class Config:
-        env_file = ".env"
-        case_sensitive = False
 
 
 settings = Settings()
