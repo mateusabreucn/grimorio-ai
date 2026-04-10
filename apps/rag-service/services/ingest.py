@@ -81,7 +81,6 @@ async def ingest_pdf(
     book_id: str,
     book_title: str,
     batch_size: int = 10,
-    delay_seconds: float = 1.5,
 ) -> int:
     """
     Ingere um PDF completo: extrai → chunkeia → embeds → salva.
@@ -92,7 +91,6 @@ async def ingest_pdf(
         book_id: Identificador único do livro (ex: "core").
         book_title: Título legível (ex: "Tormenta 20 — Livro Básico").
         batch_size: Quantos chunks processar antes de logar progresso.
-        delay_seconds: Pausa entre cada embedding para respeitar rate limits.
 
     Returns:
         Número de chunks ingeridos.
@@ -105,7 +103,6 @@ async def ingest_pdf(
         return 0
 
     logger.info("Iniciando ingestão de %d chunks para '%s'...", len(chunks), book_title)
-    logger.info("Rate limit: %.1fs de pausa entre requests", delay_seconds)
     saved = 0
 
     for i, chunk in enumerate(chunks):
@@ -131,33 +128,9 @@ async def ingest_pdf(
             if (i + 1) % batch_size == 0:
                 logger.info("  Progresso: %d/%d chunks", i + 1, len(chunks))
 
-            # Pausa para respeitar rate limit do Google AI free tier
-            if delay_seconds > 0:
-                await asyncio.sleep(delay_seconds)
-
         except Exception as exc:
             logger.error("Erro no chunk %d de '%s': %s", i, book_title, exc)
-
-            # Se foi rate limit (429), espera mais e tenta retomar
-            if "429" in str(exc) or "quota" in str(exc).lower():
-                wait = 60
-                logger.warning("Rate limit atingido. Aguardando %ds antes de continuar...", wait)
-                await asyncio.sleep(wait)
-                # Retry uma vez
-                try:
-                    embedding = await embeddings_service.embed_text(
-                        chunk["content"],
-                        task_type="retrieval_document",
-                    )
-                    await asyncio.to_thread(
-                        vector_store.save_chunk_sync,
-                        conn, book_id, book_title,
-                        chunk["content"], chunk["page_number"], i, embedding,
-                    )
-                    saved += 1
-                    logger.info("  Retry do chunk %d OK", i)
-                except Exception as retry_exc:
-                    logger.error("Retry do chunk %d também falhou: %s", i, retry_exc)
+            # Continua os demais chunks mesmo em caso de falha
 
     logger.info("✅ '%s' concluído: %d/%d chunks salvos", book_title, saved, len(chunks))
     return saved
