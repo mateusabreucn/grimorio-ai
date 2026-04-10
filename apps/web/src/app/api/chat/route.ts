@@ -74,9 +74,9 @@ export async function POST(req: Request) {
         execute: async ({ query }) => {
           try {
             const chunks = await searchChunks(query, 8);
-            return buildRagContext(chunks);
+            return { resultado: buildRagContext(chunks) };
           } catch {
-            return "Não foi possível buscar nos livros agora. Responda com o que sabe.";
+            return { resultado: "Não foi possível buscar nos livros agora." };
           }
         },
       }),
