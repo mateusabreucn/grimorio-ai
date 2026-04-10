@@ -1,0 +1,36 @@
+"""Endpoint de busca vetorial RAG."""
+
+from fastapi import APIRouter, Depends
+
+from dependencies import verify_internal_secret, get_db
+from models.schemas import SearchQuery, SearchResponse, DocumentChunk
+
+router = APIRouter(tags=["search"])
+
+
+@router.post("/search", response_model=SearchResponse)
+async def search(
+    request: SearchQuery,
+    _=Depends(verify_internal_secret),
+    conn=Depends(get_db),
+) -> SearchResponse:
+    """
+    Busca chunks relevantes dos livros via embeddings vetoriais.
+
+    Fluxo:
+    1. Gera embedding da query com Google AI
+    2. Busca chunks similares no pgvector
+    3. Retorna top-K chunks com scores de similaridade
+
+    TODO: Implementar lógica de busca (Fase 2 - Sonnet/Opus)
+    """
+    # TODO: Gerar embedding da query
+    # TODO: Buscar chunks similares com pgvector
+    # TODO: Retornar chunks com scores
+
+    # Placeholder
+    return SearchResponse(
+        query=request.query,
+        chunks=[],
+        total_chunks=0,
+    )

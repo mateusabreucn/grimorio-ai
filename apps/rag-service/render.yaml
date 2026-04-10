@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: grimorio-rag
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port 8000
+    envVars:
+      - key: DATABASE_URL
+        scope: build,runtime
+      - key: GOOGLE_AI_API_KEY
+        scope: runtime
+      - key: RAG_INTERNAL_SECRET
+        scope: runtime
+      - key: CHUNK_SIZE
+        value: "800"
+      - key: CHUNK_OVERLAP
+        value: "100"
+      - key: TOP_K
+        value: "5"
+      - key: EMBEDDING_MODEL
+        value: "models/text-embedding-004"
