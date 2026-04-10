@@ -1,4 +1,4 @@
-import { streamText, StreamData, tool } from "ai";
+import { streamText, tool } from "ai";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { z } from "zod";
 import { auth } from "@/lib/auth";
@@ -58,72 +58,57 @@ export async function POST(req: Request) {
   const userId = session?.user?.id ?? null;
   const lastUserMessage = [...clientMessages].reverse().find((m) => m.role === "user");
 
-  // StreamData envia o conversationId ao cliente para redirect após salvar
-  const streamData = new StreamData();
-
-  let result;
-  try {
-    result = await streamText({
-      model: googleAI("gemini-2.5-flash"),
-      system: GRIMORIO_SYSTEM_PROMPT,
-      messages: clientMessages,
-      maxSteps: 5,
-      tools: {
-        buscar_livros: tool({
-          description:
-            "Busca trechos relevantes nos livros de RPG. " +
-            "Para perguntas abrangentes, faça múltiplas buscas com termos diferentes.",
-          parameters: z.object({
-            query: z.string().describe("Termos de busca específicos e objetivos"),
-          }),
-          execute: async ({ query }) => {
-            try {
-              const chunks = await searchChunks(query, 8);
-              return buildRagContext(chunks);
-            } catch {
-              return "Não foi possível buscar nos livros agora. Responda com o que sabe.";
-            }
-          },
+  const result = await streamText({
+    model: googleAI("gemini-2.5-flash"),
+    system: GRIMORIO_SYSTEM_PROMPT,
+    messages: clientMessages,
+    maxSteps: 5,
+    tools: {
+      buscar_livros: tool({
+        description:
+          "Busca trechos relevantes nos livros de RPG. " +
+          "Para perguntas abrangentes, faça múltiplas buscas com termos diferentes.",
+        parameters: z.object({
+          query: z.string().describe("Termos de busca específicos e objetivos"),
         }),
-      },
-      onFinish: async ({ text }) => {
-        try {
-          if (userId && lastUserMessage) {
-            let convId = conversationId;
-
-            if (!convId) {
-              const title = lastUserMessage.content.slice(0, 60);
-              const [newConv] = await db
-                .insert(conversations)
-                .values({ userId, title })
-                .returning({ id: conversations.id });
-              convId = newConv.id;
-            }
-
-            await db.insert(messages).values([
-              { conversationId: convId, role: "user", content: lastUserMessage.content },
-              { conversationId: convId, role: "assistant", content: text },
-            ]);
-
-            await db
-              .update(conversations)
-              .set({ updatedAt: new Date() })
-              .where(eq(conversations.id, convId));
-
-            streamData.append({ conversationId: convId });
+        execute: async ({ query }) => {
+          try {
+            const chunks = await searchChunks(query, 8);
+            return buildRagContext(chunks);
+          } catch {
+            return "Não foi possível buscar nos livros agora. Responda com o que sabe.";
           }
-        } catch (err) {
-          console.error("[chat] Erro ao salvar:", err);
-        } finally {
-          streamData.close();
-        }
-      },
-    });
-  } catch (err) {
-    streamData.close();
-    console.error("[chat] Erro no streamText:", err);
-    return new Response("Erro interno ao processar mensagem.", { status: 500 });
-  }
+        },
+      }),
+    },
+    onFinish: async ({ text }) => {
+      if (!userId || !lastUserMessage) return;
+      try {
+        let convId = conversationId;
 
-  return result.toDataStreamResponse({ data: streamData });
+        if (!convId) {
+          const title = lastUserMessage.content.slice(0, 60);
+          const [newConv] = await db
+            .insert(conversations)
+            .values({ userId, title })
+            .returning({ id: conversations.id });
+          convId = newConv.id;
+        }
+
+        await db.insert(messages).values([
+          { conversationId: convId, role: "user", content: lastUserMessage.content },
+          { conversationId: convId, role: "assistant", content: text },
+        ]);
+
+        await db
+          .update(conversations)
+          .set({ updatedAt: new Date() })
+          .where(eq(conversations.id, convId));
+      } catch (err) {
+        console.error("[chat] Erro ao salvar:", err);
+      }
+    },
+  });
+
+  return result.toDataStreamResponse();
 }

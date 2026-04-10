@@ -1,55 +1,81 @@
-"use client"
+"use client";
 
-import { useEffect, useRef } from "react"
-import { useChat } from "ai/react"
-import { useRouter } from "next/navigation"
-import { MessageList } from "./message-list"
-import { ChatInput } from "./chat-input"
+import { useRef } from "react";
+import { useChat } from "ai/react";
+import { useRouter } from "next/navigation";
+import { MessageList } from "./message-list";
+import { ChatInput } from "./chat-input";
 
 interface InitialMessage {
-  id: string
-  role: "user" | "assistant"
-  content: string
+  id: string;
+  role: "user" | "assistant";
+  content: string;
 }
 
 interface ChatInterfaceProps {
-  conversationId?: string
-  initialMessages?: InitialMessage[]
+  conversationId?: string;
+  initialMessages?: InitialMessage[];
 }
 
 export function ChatInterface({ conversationId, initialMessages = [] }: ChatInterfaceProps) {
-  const router = useRouter()
-  const redirectedRef = useRef(false)
+  const router = useRouter();
+  const redirectedRef = useRef(false);
 
-  const { messages, input, handleInputChange, handleSubmit, isLoading, error, data } = useChat({
+  const { messages, input, handleInputChange, handleSubmit, isLoading, error } = useChat({
     api: "/api/chat",
     initialMessages,
     body: { conversationId },
     onError: (err: Error) => {
-      console.error("[chat] Erro:", err)
+      console.error("[chat] Erro:", err);
     },
-  })
-
-  // Redirecionar para /chat/{id} após primeira mensagem numa nova conversa
-  useEffect(() => {
-    if (!conversationId && !redirectedRef.current && data && data.length > 0) {
-      const lastData = data[data.length - 1] as Record<string, unknown>
-      const newConvId = lastData?.conversationId as string | undefined
-      if (newConvId) {
-        redirectedRef.current = true
-        router.push(`/chat/${newConvId}`)
-        router.refresh()
+    onFinish: async (message) => {
+      // Salvar no banco após resposta completa (apenas usuários logados com endpoint /api/chat)
+      if (!conversationId) {
+        const lastUserMsg = [...messages].reverse().find((m) => m.role === "user");
+        if (lastUserMsg) {
+          try {
+            const res = await fetch("/api/chat/save", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                userMessage: lastUserMsg.content,
+                assistantMessage: message.content,
+              }),
+            });
+            if (res.ok) {
+              const data = await res.json();
+              if (data.conversationId && !redirectedRef.current) {
+                redirectedRef.current = true;
+                router.push(`/chat/${data.conversationId}`);
+                router.refresh();
+              }
+            }
+          } catch (err) {
+            console.error("[chat] Erro ao salvar:", err);
+          }
+        }
+      } else {
+        // Conversa existente — salva e atualiza sidebar
+        const lastUserMsg = [...messages].reverse().find((m) => m.role === "user");
+        if (lastUserMsg) {
+          try {
+            await fetch("/api/chat/save", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                conversationId,
+                userMessage: lastUserMsg.content,
+                assistantMessage: message.content,
+              }),
+            });
+            router.refresh();
+          } catch {
+            // Silencioso — não bloqueia a UX
+          }
+        }
       }
-    }
-  }, [data, conversationId, router])
-
-  // Atualizar sidebar quando a conversa já existe e há novas mensagens
-  useEffect(() => {
-    if (conversationId && !isLoading && messages.length > 0) {
-      router.refresh()
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isLoading])
+    },
+  });
 
   return (
     <div className="flex flex-col h-full">
@@ -70,5 +96,5 @@ export function ChatInterface({ conversationId, initialMessages = [] }: ChatInte
         onSubmit={handleSubmit}
       />
     </div>
-  )
+  );
 }
