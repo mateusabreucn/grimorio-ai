@@ -3,14 +3,16 @@
 from fastapi import APIRouter, Depends
 
 from dependencies import verify_internal_secret, get_db
-from models.schemas import SearchQuery, SearchResponse
+from models.schemas import SearchRequest, SearchResponse
+from services import embeddings as embeddings_service
+from services import vector_store
 
 router = APIRouter(tags=["search"])
 
 
 @router.post("/search", response_model=SearchResponse)
 async def search(
-    request: SearchQuery,
+    request: SearchRequest,
     _=Depends(verify_internal_secret),
     conn=Depends(get_db),
 ) -> SearchResponse:
@@ -18,19 +20,20 @@ async def search(
     Busca chunks relevantes dos livros via embeddings vetoriais.
 
     Fluxo:
-    1. Gera embedding da query com Google AI
-    2. Busca chunks similares no pgvector
-    3. Retorna top-K chunks com scores de similaridade
-
-    TODO: Implementar lógica de busca (Fase 2 - Sonnet/Opus)
+    1. Gera embedding da query com Google AI (task_type=retrieval_query)
+    2. Busca chunks similares no pgvector por cosine similarity
+    3. Retorna top-K chunks ordenados por relevância
     """
-    # TODO: Gerar embedding da query
-    # TODO: Buscar chunks similares com pgvector
-    # TODO: Retornar chunks com scores
+    embedding = await embeddings_service.embed_query(request.query)
 
-    # Placeholder
+    chunks = await vector_store.similarity_search(
+        conn=conn,
+        embedding=embedding,
+        top_k=request.top_k,
+        book_id=request.book_id,
+    )
+
     return SearchResponse(
         query=request.query,
-        chunks=[],
-        total_chunks=0,
+        chunks=chunks,
     )

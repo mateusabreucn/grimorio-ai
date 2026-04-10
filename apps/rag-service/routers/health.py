@@ -26,11 +26,17 @@ async def health_check(conn=Depends(get_db)) -> HealthResponse:
     except psycopg2.Error:
         db_status = "error"
 
-    # TODO: Testar conexão com Google AI
-    embeddings_status = "ok"
+    # Testa conexão com Google AI
+    from services import embeddings as embeddings_service
+    try:
+        ok = await embeddings_service.test_connection()
+        embeddings_status = "ok" if ok else "error"
+    except Exception:
+        embeddings_status = "error"
 
+    all_ok = db_status == "ok" and embeddings_status == "ok"
     return HealthResponse(
-        status="ok" if db_status == "ok" else "degraded",
+        status="ok" if all_ok else "degraded",
         database=db_status,
         embeddings=embeddings_status,
     )
