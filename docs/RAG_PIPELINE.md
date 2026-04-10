@@ -19,7 +19,7 @@ Chunking (800 tokens, overlap 100)
 Embeddings (text-embedding-004 Google)
       ↓
 Armazenamento no PostgreSQL (pgvector)
-      
+
   [RUNTIME — a cada mensagem do usuário]
       ↓
 Query do usuário
@@ -128,7 +128,7 @@ async def search_books(
 ):
     # 1. Gera embedding da query
     query_embedding = await embeddings_service.embed_text(request.query)
-    
+
     # 2. Busca chunks similares no pgvector
     chunks = await vector_store.similarity_search(
         embedding=query_embedding,
@@ -136,7 +136,7 @@ async def search_books(
         book_id=request.book_id,
         threshold=SIMILARITY_THRESHOLD
     )
-    
+
     return SearchResponse(chunks=chunks, query=request.query)
 ```
 
@@ -153,13 +153,13 @@ async def similarity_search(
     book_id: str | None = None,
     threshold: float = 0.3
 ) -> list[ChunkResult]:
-    
+
     embedding_str = "[" + ",".join(str(x) for x in embedding) + "]"
-    
+
     book_filter = f"AND book_id = '{book_id}'" if book_id else ""
-    
+
     query = f"""
-        SELECT 
+        SELECT
             content,
             book_id,
             book_title,
@@ -171,7 +171,7 @@ async def similarity_search(
         ORDER BY embedding <=> '{embedding_str}'::vector
         LIMIT {top_k}
     """
-    
+
     # Executa via psycopg2 (conexão direta ao PostgreSQL)
     ...
 ```
@@ -188,8 +188,10 @@ import asyncio
 from pathlib import Path
 
 BOOKS = [
-    {"path": "data/books/book_1.pdf", "id": "book_1", "title": "NOME DO LIVRO 1"},
-    {"path": "data/books/book_2.pdf", "id": "book_2", "title": "NOME DO LIVRO 2"},
+    {"path": "data/books/T20-Livro Básico.pdf",  "id": "core",    "title": "Tormenta 20 — Livro Básico"},
+    {"path": "data/books/T20-Ameacas-de-Arton.pdf",     "id": "supl_01", "title": "Ameaças de Arton"},
+    {"path": "data/books/T20-Deuses-de-Arton.pdf",     "id": "supl_02", "title": "Deuses de Arton"},
+    {"path": "data/books/T20-Herois-de-Arton.pdf",     "id": "supl_03", "title": "Heróis de Arton"},
 ]
 
 async def ingest_all():
@@ -197,7 +199,7 @@ async def ingest_all():
         print(f"Ingerindo: {book['title']}")
         chunks = extract_and_chunk_pdf(book['path'])
         print(f"  {len(chunks)} chunks extraídos")
-        
+
         for i, chunk in enumerate(chunks):
             embedding = await embed_text(chunk['content'])
             await save_chunk(
@@ -208,10 +210,10 @@ async def ingest_all():
                 chunk_index=i,
                 embedding=embedding
             )
-            
+
             if i % 10 == 0:
                 print(f"  Progresso: {i}/{len(chunks)}")
-        
+
         print(f"  ✅ {book['title']} concluído!")
 
 if __name__ == "__main__":
@@ -228,12 +230,12 @@ if __name__ == "__main__":
 function buildPrompt(
   userMessage: string,
   ragChunks: ChunkResult[],
-  history: Message[]
+  history: Message[],
 ): string {
   const context = ragChunks
-    .map(c => `[${c.book_title} - p.${c.page_number}]\n${c.content}`)
-    .join("\n\n---\n\n")
-  
+    .map((c) => `[${c.book_title} - p.${c.page_number}]\n${c.content}`)
+    .join("\n\n---\n\n");
+
   const systemPrompt = `Você é o Grimório, um sábio especialista nos livros de RPG fornecidos.
 Responda APENAS com base no conteúdo dos livros no contexto abaixo.
 Se a informação não estiver nos livros, diga claramente que não encontrou.
@@ -242,9 +244,9 @@ Responda sempre em português do Brasil.
 Nunca invente regras que não estejam nos livros.
 
 CONTEXTO DOS LIVROS:
-${context}`
+${context}`;
 
-  return systemPrompt
+  return systemPrompt;
 }
 ```
 
@@ -274,6 +276,7 @@ services:
 ## CHECKLIST DE QUALIDADE DO RAG
 
 Após ingestão, valide com estas perguntas aos livros:
+
 - "Quais são as classes disponíveis?"
 - "Como funciona o sistema de magia?"
 - "Qual a diferença entre [classe A] e [classe B]?"

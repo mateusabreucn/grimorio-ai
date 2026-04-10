@@ -4,9 +4,12 @@
   "private": true,
   "packageManager": "pnpm@9.0.0",
   "scripts": {
+    "setup": "pnpm install && pnpm db:migrate",
     "dev:web": "pnpm --filter web dev",
     "dev:rag": "cd apps/rag-service && uvicorn main:app --reload --port 8000",
+    "dev": "pnpm dev:web",
     "build": "pnpm --filter web build",
+    "start": "pnpm --filter web start",
     "test": "pnpm --filter web test && cd apps/rag-service && pytest",
     "test:web": "pnpm --filter web test",
     "test:rag": "cd apps/rag-service && pytest",

@@ -17,7 +17,7 @@ PROGRESSO:  [ ] Não iniciado
 ## FASE 1 — Fundação e Infraestrutura
 **Estimativa:** Dia 1-2  
 **Quem faz:** Claude Code (Sonnet 4.6) com supervisão humana nas configs de infra  
-**Status:** `[ ] Não iniciado`
+**Status:** `[em andamento]`
 
 ### Objetivos
 - [ ] Setup do monorepo com pnpm workspaces
@@ -70,7 +70,9 @@ apps/web/
 **Status:** `[ ] Bloqueado — aguarda Fase 1`
 
 ### Pré-requisito
-Fase 1 concluída. PDFs dos dois livros disponíveis em `apps/rag-service/data/books/`.
+Fase 1 concluída. PDFs dos quatro livros disponíveis em 
+`apps/rag-service/data/books/`. Análises do NotebookLM 
+disponíveis em `apps/rag-service/data/analysis/`.
 
 ### Objetivos
 - [ ] Projeto FastAPI com estrutura limpa
