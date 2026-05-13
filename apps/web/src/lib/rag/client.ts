@@ -19,6 +19,21 @@ export interface RagSearchResponse {
   chunks: RagChunk[]
 }
 
+export interface RagMultiSearchResponse {
+  queries: string[]
+  chunks: RagChunk[]
+  total_unique: number
+}
+
+export interface MultiSearchOptions {
+  keywords?: string[]
+  topKPerQuery?: number
+  topKLexical?: number
+  maxTotalResults?: number
+  bookId?: string
+  threshold?: number
+}
+
 /**
  * Busca chunks relevantes no RAG service.
  * Retorna [] em caso de erro para não bloquear o chat.
@@ -49,6 +64,58 @@ export async function searchChunks(
     return data.chunks
   } catch (err) {
     console.error("[RAG] Search error:", err)
+    return []
+  }
+}
+
+/**
+ * Busca chunks com múltiplas queries em paralelo (deduplicado server-side).
+ * Ideal para perguntas amplas, enumerações ou quando o termo do usuário não
+ * bate com o vocabulário do livro.
+ */
+export async function searchMulti(
+  queries: string[],
+  options: MultiSearchOptions = {},
+): Promise<RagChunk[]> {
+  if (queries.length === 0) return []
+
+  const {
+    keywords = [],
+    topKPerQuery = 8,
+    topKLexical = 12,
+    maxTotalResults = 30,
+    bookId,
+    threshold,
+  } = options
+
+  try {
+    const response = await fetch(`${env.RAG_SERVICE_URL}/search/multi`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${env.RAG_INTERNAL_SECRET}`,
+      },
+      body: JSON.stringify({
+        queries,
+        keywords,
+        top_k_per_query: topKPerQuery,
+        top_k_lexical: topKLexical,
+        max_total_results: maxTotalResults,
+        book_id: bookId ?? null,
+        threshold: threshold ?? null,
+      }),
+      signal: AbortSignal.timeout(20_000),
+    })
+
+    if (!response.ok) {
+      console.error("[RAG] Multi-search failed:", response.status, await response.text())
+      return []
+    }
+
+    const data: RagMultiSearchResponse = await response.json()
+    return data.chunks
+  } catch (err) {
+    console.error("[RAG] Multi-search error:", err)
     return []
   }
 }
