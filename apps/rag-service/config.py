@@ -24,8 +24,8 @@ class Settings(BaseSettings):
     # Configurações RAG
     chunk_size: int = 800
     chunk_overlap: int = 100
-    top_k: int = 5
-    similarity_threshold: float = 0.3
+    top_k: int = 12
+    similarity_threshold: float = 0.45
 
 
 settings = Settings()

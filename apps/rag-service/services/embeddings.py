@@ -65,6 +65,23 @@ async def embed_query(query: str) -> list[float]:
     return await asyncio.to_thread(embed_query_sync, query)
 
 
+def embed_queries_batch_sync(queries: list[str]) -> list[list[float]]:
+    """Gera embeddings para múltiplas queries em uma chamada Voyage AI."""
+    if not queries:
+        return []
+    result = _client.embed(
+        texts=queries,
+        model=settings.embedding_model,
+        input_type="query",
+    )
+    return result.embeddings
+
+
+async def embed_queries_batch(queries: list[str]) -> list[list[float]]:
+    """Versão assíncrona do embed_queries_batch_sync."""
+    return await asyncio.to_thread(embed_queries_batch_sync, queries)
+
+
 async def test_connection() -> bool:
     """Testa se a Voyage AI está acessível e o modelo está disponível."""
     try:

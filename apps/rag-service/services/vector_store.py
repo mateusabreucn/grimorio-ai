@@ -113,6 +113,137 @@ async def similarity_search(
     )
 
 
+# Score artificial atribuído a matches lexicais. Fica numa faixa "boa" sem
+# mascarar matches vetoriais reais (que geralmente vão de 0.4 a 0.8). Quando
+# o mesmo chunk aparece em ambos os tipos de busca, o merge pega o max.
+_LEXICAL_BASE_SCORE = 0.75
+
+
+def lexical_search_sync(
+    conn: "PgConnection",
+    keywords: list[str],
+    top_k: int = 10,
+    book_id: str | None = None,
+) -> list[ChunkResult]:
+    """
+    Busca chunks que contenham literalmente alguma das keywords (case-insensitive).
+
+    Usa ILIKE com OR. Resultados recebem similarity_score artificial alto
+    (_LEXICAL_BASE_SCORE) para que matches exatos sejam priorizados no ranking
+    final. Chunks que casam com várias keywords ganham bônus marginal.
+
+    Args:
+        conn: Conexão PostgreSQL.
+        keywords: Termos a procurar (cada um vira um ILIKE OR).
+        top_k: Limite de resultados.
+        book_id: Filtra por livro (None = todos).
+
+    Returns:
+        Lista de ChunkResult ordenada por número de keywords que casaram (desc).
+    """
+    # Sanitiza e remove duplicatas mantendo ordem
+    seen: set[str] = set()
+    clean_kws: list[str] = []
+    for kw in keywords:
+        norm = (kw or "").strip()
+        if not norm or len(norm) < 2:
+            continue
+        low = norm.lower()
+        if low in seen:
+            continue
+        seen.add(low)
+        clean_kws.append(norm)
+
+    if not clean_kws:
+        return []
+
+    # Monta SELECT que conta quantas keywords casaram (pra desempate)
+    match_exprs = []
+    where_exprs = []
+    params: list[object] = []
+    for kw in clean_kws:
+        like = f"%{kw}%"
+        match_exprs.append("(CASE WHEN content ILIKE %s THEN 1 ELSE 0 END)")
+        params.append(like)
+        where_exprs.append("content ILIKE %s")
+        params.append(like)
+
+    match_count_sql = " + ".join(match_exprs)
+    where_sql = "(" + " OR ".join(where_exprs) + ")"
+
+    if book_id:
+        sql = f"""
+            SELECT
+                id::text,
+                book_id,
+                book_title,
+                content,
+                page_number,
+                chunk_index,
+                ({match_count_sql}) AS match_count
+            FROM document_chunks
+            WHERE {where_sql}
+              AND book_id = %s
+            ORDER BY match_count DESC, chunk_index ASC
+            LIMIT %s
+        """
+        params.append(book_id)
+        params.append(top_k)
+    else:
+        sql = f"""
+            SELECT
+                id::text,
+                book_id,
+                book_title,
+                content,
+                page_number,
+                chunk_index,
+                ({match_count_sql}) AS match_count
+            FROM document_chunks
+            WHERE {where_sql}
+            ORDER BY match_count DESC, chunk_index ASC
+            LIMIT %s
+        """
+        params.append(top_k)
+
+    cursor = conn.cursor()
+    try:
+        cursor.execute(sql, params)
+        rows = cursor.fetchall()
+    finally:
+        cursor.close()
+
+    total_kws = max(1, len(clean_kws))
+    results: list[ChunkResult] = []
+    for row in rows:
+        match_count = int(row[6])
+        # Bônus marginal: cada keyword extra adiciona até +0.05, sem ultrapassar 0.9
+        boost = min(0.15, 0.05 * (match_count - 1))
+        score = min(0.9, _LEXICAL_BASE_SCORE + boost) if match_count > 0 else _LEXICAL_BASE_SCORE
+        results.append(
+            ChunkResult(
+                content=row[3],
+                book_id=row[1],
+                book_title=row[2],
+                page_number=row[4],
+                chunk_index=row[5],
+                similarity_score=score,
+            )
+        )
+
+    return results
+
+
+async def lexical_search(
+    conn: "PgConnection",
+    keywords: list[str],
+    top_k: int = 10,
+    book_id: str | None = None,
+) -> list[ChunkResult]:
+    """Versão assíncrona do lexical_search_sync."""
+    return await asyncio.to_thread(lexical_search_sync, conn, keywords, top_k, book_id)
+
+
 def save_chunk_sync(
     conn: "PgConnection",
     book_id: str,
