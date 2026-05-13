@@ -8,12 +8,22 @@ export default auth((req) => {
   const { pathname } = req.nextUrl
   const isLoggedIn = !!req.auth
 
-  // /journal requer auth — /chat é público (sem login: sem histórico)
-  const isJournalRoute = pathname.startsWith("/journal")
+  // Journal, Persona, Chat (logado) e Settings requerem auth
+  const isProtectedRoute = 
+    pathname.startsWith("/journal") || 
+    pathname.startsWith("/persona") || 
+    pathname.startsWith("/chat") ||
+    pathname.startsWith("/settings") ||
+    pathname.startsWith("/profile")
+
   const isAuthRoute =
     pathname.startsWith("/login") || pathname.startsWith("/register")
 
-  if (isJournalRoute && !isLoggedIn) {
+  if (isProtectedRoute && !isLoggedIn) {
+    // Se for chat, permite o acesso público mas sem a proteção de rota logada
+    // (O layout tratará a exibição do modo visitante)
+    if (pathname.startsWith("/chat")) return NextResponse.next()
+    
     return NextResponse.redirect(new URL("/login", req.url))
   }
 
