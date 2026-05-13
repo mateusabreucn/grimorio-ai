@@ -4,6 +4,7 @@ import {
   text,
   timestamp,
   integer,
+  jsonb,
   index,
   uniqueIndex,
   primaryKey,
@@ -104,6 +105,25 @@ export const messages = pgTable(
   })
 )
 
+// ─── MESSAGE FEEDBACK ─────────────────────────────────────────────────────────
+
+export const messageFeedback = pgTable(
+  "message_feedback",
+  {
+    id:                uuid("id").primaryKey().defaultRandom(),
+    messageId:         uuid("message_id").notNull().references(() => messages.id, { onDelete: "cascade" }),
+    userId:            uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    vote:              text("vote").notNull(),                  // "up" | "down"
+    comment:           text("comment"),                          // opcional, validado em Zod (max 2000)
+    pipelineSnapshot:  jsonb("pipeline_snapshot"),               // snapshot do retrieval no momento da resposta
+    createdAt:         timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+  },
+  (table) => ({
+    uniqUserMessage:  uniqueIndex("message_feedback_user_message_idx").on(table.messageId, table.userId),
+    voteCreatedIdx:   index("message_feedback_vote_created_idx").on(table.vote, table.createdAt),
+  })
+)
+
 // ─── JOURNAL ENTRIES ──────────────────────────────────────────────────────────
 
 export const journalEntries = pgTable(
@@ -145,6 +165,7 @@ export const usersRelations = relations(users, ({ many }) => ({
   sessions:       many(sessions),
   conversations:  many(conversations),
   journalEntries: many(journalEntries),
+  feedback:       many(messageFeedback),
 }))
 
 export const conversationsRelations = relations(conversations, ({ one, many }) => ({
@@ -152,10 +173,22 @@ export const conversationsRelations = relations(conversations, ({ one, many }) =
   messages: many(messages),
 }))
 
-export const messagesRelations = relations(messages, ({ one }) => ({
+export const messagesRelations = relations(messages, ({ one, many }) => ({
   conversation: one(conversations, {
     fields: [messages.conversationId],
     references: [conversations.id],
+  }),
+  feedback: many(messageFeedback),
+}))
+
+export const messageFeedbackRelations = relations(messageFeedback, ({ one }) => ({
+  message: one(messages, {
+    fields: [messageFeedback.messageId],
+    references: [messages.id],
+  }),
+  user: one(users, {
+    fields: [messageFeedback.userId],
+    references: [users.id],
   }),
 }))
 

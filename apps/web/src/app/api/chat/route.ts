@@ -6,13 +6,19 @@ import { env } from "@/lib/env";
 import { db } from "@/lib/db";
 import { conversations, messages } from "@/lib/db/schema";
 import { and, eq } from "drizzle-orm";
-import { searchMulti } from "@/lib/rag/client";
+import { searchMulti, type MultiSearchResult } from "@/lib/rag/client";
 import {
   PLANNER_SYSTEM_PROMPT,
   SYNTHESIZER_SYSTEM_PROMPT,
+  SYNTHESIZER_FALLBACK_PROMPT,
   buildRagContext,
 } from "@/lib/ai/prompts";
 import { chatRequestSchema } from "@/lib/validations/chat";
+import { logChatEvent } from "@/lib/observability/logger";
+import {
+  setSnapshot,
+  type PipelineSnapshot,
+} from "@/lib/observability/snapshot-cache";
 import { Ratelimit } from "@upstash/ratelimit";
 import { Redis } from "@upstash/redis";
 
@@ -81,6 +87,10 @@ function sanitizeHistory(input: unknown[]): SanitizedMessage[] {
 }
 
 export async function POST(req: Request) {
+  const requestId = crypto.randomUUID();
+  const assistantMessageId = crypto.randomUUID();
+  const nowIso = () => new Date().toISOString();
+
   let body: unknown;
   try {
     body = await req.json();
@@ -145,6 +155,7 @@ export async function POST(req: Request) {
   }
 
   // ─── Step 1: PLANNER — decide se busca, gera queries + keywords ──────────
+  const plannerStart = Date.now();
   let queries: string[] = [];
   let keywords: string[] = [];
   let needsSearch = false;
@@ -166,62 +177,178 @@ export async function POST(req: Request) {
       .filter((k) => k.length >= 2)
       .slice(0, 4);
   } catch (err) {
-    console.error("[chat] Planner falhou, usando fallback:", err);
+    logChatEvent({
+      type: "pipeline.error",
+      request_id: requestId,
+      timestamp: nowIso(),
+      conversation_id: resolvedConversationId ?? null,
+      user_id: userId,
+      stage: "planner",
+      message: err instanceof Error ? err.message : String(err),
+    });
     needsSearch = true;
     queries = [lastUserMessage.content.slice(0, 120)];
     keywords = [];
   }
+  const plannerElapsed = Date.now() - plannerStart;
+  logChatEvent({
+    type: "planner.done",
+    request_id: requestId,
+    timestamp: nowIso(),
+    conversation_id: resolvedConversationId ?? null,
+    user_id: userId,
+    needs_search: needsSearch,
+    queries,
+    keywords,
+    elapsed_ms: plannerElapsed,
+  });
 
-  // ─── Step 2: Multi-search híbrida (vetorial + lexical) ───────────────────
-  const chunks =
-    needsSearch && queries.length > 0
-      ? await searchMulti(queries, {
-          keywords,
-          topKPerQuery: 8,
-          topKLexical: 12,
-          maxTotalResults: 24,
-          bookId: bookIdFilter,
-        })
-      : [];
+  // ─── Step 2: Busca híbrida com retorno estruturado ───────────────────────
+  let ragResult: MultiSearchResult = {
+    chunks: [],
+    attempts: 0,
+    elapsedMs: 0,
+  };
+  if (needsSearch && queries.length > 0) {
+    ragResult = await searchMulti(queries, {
+      keywords,
+      topKPerQuery: 8,
+      topKLexical: 12,
+      maxTotalResults: 24,
+      bookId: bookIdFilter,
+    });
+  }
+  logChatEvent({
+    type: "rag.done",
+    request_id: requestId,
+    timestamp: nowIso(),
+    conversation_id: resolvedConversationId ?? null,
+    user_id: userId,
+    chunk_count: ragResult.chunks.length,
+    top_chunks: ragResult.chunks.slice(0, 5).map((c) => ({
+      book_id: c.book_id,
+      page: c.page_number,
+      score: Number(c.similarity_score.toFixed(3)),
+    })),
+    error_type: ragResult.error,
+    attempts: ragResult.attempts,
+    elapsed_ms: ragResult.elapsedMs,
+  });
 
-  // ─── Step 3: SYNTHESIZER — streaming com contexto injetado ────────────────
+  const ragFailed = needsSearch && ragResult.error !== undefined;
+
+  // ─── Step 3: SYNTHESIZER — streaming, com fallback se RAG falhou ─────────
+  const synthesizerSystem = ragFailed
+    ? SYNTHESIZER_FALLBACK_PROMPT
+    : SYNTHESIZER_SYSTEM_PROMPT;
+
   const synthesizerMessages: CoreMessage[] = history.map((m, i) => {
     const isLast = i === history.length - 1;
-    if (isLast && m.role === "user" && needsSearch) {
+    if (isLast && m.role === "user" && needsSearch && !ragFailed) {
       return {
         role: "user",
-        content: `${m.content}\n\n${buildRagContext(chunks)}`,
+        content: `${m.content}\n\n${buildRagContext(ragResult.chunks)}`,
       };
     }
     return m as CoreMessage;
   });
 
+  const synthesizerStart = Date.now();
+
   const result = await streamText({
     model: googleAI(SYNTHESIZER_MODEL),
-    system: SYNTHESIZER_SYSTEM_PROMPT,
+    system: synthesizerSystem,
     messages: synthesizerMessages,
     temperature: 0,
     onFinish: async ({ text }) => {
-      if (!userId || !resolvedConversationId) return;
-      try {
-        await db.insert(messages).values([
-          { conversationId: resolvedConversationId, role: "user", content: lastUserMessage.content },
-          { conversationId: resolvedConversationId, role: "assistant", content: text },
-        ]);
+      const synthesizerElapsed = Date.now() - synthesizerStart;
+      const answerPreview = text.slice(0, 200);
 
-        await db
-          .update(conversations)
-          .set({ updatedAt: new Date() })
-          .where(eq(conversations.id, resolvedConversationId));
-      } catch (err) {
-        console.error("[chat] Erro ao salvar:", err);
+      logChatEvent({
+        type: "synthesizer.done",
+        request_id: requestId,
+        timestamp: nowIso(),
+        conversation_id: resolvedConversationId ?? null,
+        user_id: userId,
+        assistant_message_id: assistantMessageId,
+        answer_preview: answerPreview,
+        used_fallback: ragFailed,
+        elapsed_ms: synthesizerElapsed,
+      });
+
+      if (userId && resolvedConversationId) {
+        // Snapshot do pipeline para uso futuro pelo endpoint de feedback.
+        const snapshot: PipelineSnapshot = {
+          question: lastUserMessage.content,
+          needs_search: needsSearch,
+          queries,
+          keywords,
+          rag: {
+            chunk_count: ragResult.chunks.length,
+            top_chunks: ragResult.chunks.slice(0, 10).map((c) => ({
+              book_id: c.book_id,
+              book_title: c.book_title,
+              page: c.page_number,
+              score: Number(c.similarity_score.toFixed(3)),
+              preview: c.content.slice(0, 240).replace(/\n/g, " "),
+            })),
+            error_type: ragResult.error,
+            attempts: ragResult.attempts,
+            elapsed_ms: ragResult.elapsedMs,
+          },
+          synthesizer: {
+            used_fallback: ragFailed,
+            answer_preview: answerPreview,
+            elapsed_ms: synthesizerElapsed,
+          },
+          model: SYNTHESIZER_MODEL,
+          created_at: nowIso(),
+        };
+        setSnapshot(assistantMessageId, snapshot);
+
+        try {
+          await db.insert(messages).values([
+            {
+              conversationId: resolvedConversationId,
+              role: "user",
+              content: lastUserMessage.content,
+            },
+            {
+              id: assistantMessageId,
+              conversationId: resolvedConversationId,
+              role: "assistant",
+              content: text,
+            },
+          ]);
+
+          await db
+            .update(conversations)
+            .set({ updatedAt: new Date() })
+            .where(eq(conversations.id, resolvedConversationId));
+        } catch (err) {
+          logChatEvent({
+            type: "pipeline.error",
+            request_id: requestId,
+            timestamp: nowIso(),
+            conversation_id: resolvedConversationId,
+            user_id: userId,
+            stage: "persist",
+            message: err instanceof Error ? err.message : String(err),
+          });
+        }
       }
     },
   });
 
+  const responseHeaders: Record<string, string> = {};
+  if (resolvedConversationId) {
+    responseHeaders["x-conversation-id"] = resolvedConversationId;
+  }
+  if (userId) {
+    responseHeaders["x-assistant-message-id"] = assistantMessageId;
+  }
+
   return result.toDataStreamResponse({
-    headers: resolvedConversationId
-      ? { "x-conversation-id": resolvedConversationId }
-      : undefined,
+    headers: Object.keys(responseHeaders).length > 0 ? responseHeaders : undefined,
   });
 }

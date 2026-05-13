@@ -32,52 +32,69 @@ export interface MultiSearchOptions {
   maxTotalResults?: number
   bookId?: string
   threshold?: number
+  timeoutMs?: number
+}
+
+export type RagErrorType = "timeout" | "http_5xx" | "http_4xx" | "network"
+
+export interface MultiSearchResult {
+  chunks: RagChunk[]
+  error?: RagErrorType
+  attempts: number
+  elapsedMs: number
+}
+
+const DEFAULT_TIMEOUT_MS = 20_000
+const MAX_ATTEMPTS = 3
+const BACKOFF_MS = [500, 1500]
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+function classifyError(err: unknown): RagErrorType {
+  if (err instanceof Error) {
+    if (err.name === "AbortError" || err.name === "TimeoutError") return "timeout"
+    if (err.name === "TypeError") return "network"
+  }
+  return "network"
 }
 
 /**
- * Busca chunks relevantes no RAG service.
- * Retorna [] em caso de erro para não bloquear o chat.
+ * Busca chunks relevantes no RAG service (single query, legado).
+ * Mantida para compatibilidade com consumidores antigos (ex: golden eval).
  */
 export async function searchChunks(
   query: string,
   topK: number = 5,
   bookId?: string,
 ): Promise<RagChunk[]> {
-  try {
-    const response = await fetch(`${env.RAG_SERVICE_URL}/search`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${env.RAG_INTERNAL_SECRET}`,
-      },
-      body: JSON.stringify({ query, top_k: topK, book_id: bookId ?? null }),
-      // Timeout de 10s para não bloquear o stream do chat
-      signal: AbortSignal.timeout(10_000),
-    })
-
-    if (!response.ok) {
-      console.error("[RAG] Search failed:", response.status, await response.text())
-      return []
-    }
-
-    const data: RagSearchResponse = await response.json()
-    return data.chunks
-  } catch (err) {
-    console.error("[RAG] Search error:", err)
-    return []
-  }
+  const result = await searchMulti([query], {
+    topKPerQuery: topK,
+    topKLexical: 0,
+    maxTotalResults: topK,
+    bookId,
+  })
+  return result.chunks
 }
 
 /**
- * Busca chunks com múltiplas queries em paralelo (deduplicado server-side).
- * Ideal para perguntas amplas, enumerações ou quando o termo do usuário não
- * bate com o vocabulário do livro.
+ * Busca híbrida (vetorial + lexical) com múltiplas queries.
+ *
+ * Comportamento de erro:
+ *  - 4xx → não retentamos (erro do nosso lado)
+ *  - timeout/5xx/rede → até 3 tentativas com backoff 500ms → 1500ms
+ *  - todos os caminhos retornam estrutura com `error?` quando aplicável; nunca lança
  */
 export async function searchMulti(
   queries: string[],
   options: MultiSearchOptions = {},
-): Promise<RagChunk[]> {
-  if (queries.length === 0) return []
+): Promise<MultiSearchResult> {
+  const startedAt = Date.now()
+
+  if (queries.length === 0) {
+    return { chunks: [], attempts: 0, elapsedMs: 0 }
+  }
 
   const {
     keywords = [],
@@ -86,36 +103,77 @@ export async function searchMulti(
     maxTotalResults = 30,
     bookId,
     threshold,
+    timeoutMs = DEFAULT_TIMEOUT_MS,
   } = options
 
-  try {
-    const response = await fetch(`${env.RAG_SERVICE_URL}/search/multi`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${env.RAG_INTERNAL_SECRET}`,
-      },
-      body: JSON.stringify({
-        queries,
-        keywords,
-        top_k_per_query: topKPerQuery,
-        top_k_lexical: topKLexical,
-        max_total_results: maxTotalResults,
-        book_id: bookId ?? null,
-        threshold: threshold ?? null,
-      }),
-      signal: AbortSignal.timeout(20_000),
-    })
+  const body = JSON.stringify({
+    queries,
+    keywords,
+    top_k_per_query: topKPerQuery,
+    top_k_lexical: topKLexical,
+    max_total_results: maxTotalResults,
+    book_id: bookId ?? null,
+    threshold: threshold ?? null,
+  })
 
-    if (!response.ok) {
-      console.error("[RAG] Multi-search failed:", response.status, await response.text())
-      return []
+  let lastError: RagErrorType | undefined
+
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    try {
+      const response = await fetch(`${env.RAG_SERVICE_URL}/search/multi`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${env.RAG_INTERNAL_SECRET}`,
+        },
+        body,
+        signal: AbortSignal.timeout(timeoutMs),
+      })
+
+      if (response.ok) {
+        const data = (await response.json()) as RagMultiSearchResponse
+        return {
+          chunks: data.chunks,
+          attempts: attempt,
+          elapsedMs: Date.now() - startedAt,
+        }
+      }
+
+      // Erro HTTP — classifica e decide se retentamos
+      const errText = await response.text().catch(() => "")
+      console.error(
+        `[RAG] /search/multi attempt=${attempt} status=${response.status} body=${errText.slice(0, 200)}`,
+      )
+
+      if (response.status >= 500) {
+        lastError = "http_5xx"
+        // segue pro retry
+      } else {
+        // 4xx → erro do nosso lado, não adianta retentar
+        return {
+          chunks: [],
+          error: "http_4xx",
+          attempts: attempt,
+          elapsedMs: Date.now() - startedAt,
+        }
+      }
+    } catch (err) {
+      lastError = classifyError(err)
+      console.error(
+        `[RAG] /search/multi attempt=${attempt} error=${lastError}: ${err instanceof Error ? err.message : String(err)}`,
+      )
     }
 
-    const data: RagMultiSearchResponse = await response.json()
-    return data.chunks
-  } catch (err) {
-    console.error("[RAG] Multi-search error:", err)
-    return []
+    // Aguarda backoff antes da próxima tentativa, se houver
+    if (attempt < MAX_ATTEMPTS) {
+      await sleep(BACKOFF_MS[attempt - 1] ?? 1500)
+    }
+  }
+
+  return {
+    chunks: [],
+    error: lastError ?? "network",
+    attempts: MAX_ATTEMPTS,
+    elapsedMs: Date.now() - startedAt,
   }
 }
