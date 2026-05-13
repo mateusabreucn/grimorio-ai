@@ -4,13 +4,13 @@ import { type FormEvent, useRef, useEffect } from "react"
 import { Textarea } from "@/components/ui/textarea"
 import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
-import { Box, BookOpen, Loader2, Search, SendHorizontal, Sparkles } from "lucide-react"
+import { Coins, HelpCircle, GraduationCap, Loader2, SendHorizontal } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 interface ChatInputProps {
   input: string
   isLoading: boolean
-  onInputChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => void
+  onInputChange: (value: string) => void
   onSubmit: (e: FormEvent<HTMLFormElement>) => void
   placeholder?: string
   supplementsEnabled?: boolean
@@ -27,6 +27,11 @@ export function ChatInput({
   onSupplementsToggle,
 }: ChatInputProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+  const handleActionClick = (prefix: string) => {
+    onInputChange(prefix)
+    textareaRef.current?.focus()
+  }
 
   useEffect(() => {
     const el = textareaRef.current
@@ -49,14 +54,14 @@ export function ChatInput({
       <div className="mx-auto max-w-5xl">
         <div className="mb-3 flex flex-wrap items-center gap-2">
           {[
-            { label: "Rolar iniciativa", icon: Box },
-            { label: "Explicar perícia", icon: BookOpen },
-            { label: "Gerar NPC", icon: Sparkles },
-            { label: "Sugerir loot", icon: Search },
-          ].map(({ label, icon: Icon }) => (
+            { label: "Ver Preço", icon: Coins, prefix: "Me informe o valor em tibares do produto: " },
+            { label: "Recomendar algo", icon: GraduationCap, prefix: "Me recomende algo para melhorar a minha build de: " },
+            { label: "Questionar sobre o mundo", icon: HelpCircle, prefix: "Me explique o atributo/perícia/magia/equipamento: " },
+          ].map(({ label, icon: Icon, prefix }) => (
             <button
               key={label}
               type="button"
+              onClick={() => handleActionClick(prefix)}
               className="flex items-center gap-2 rounded-full border border-border/70 bg-[hsl(var(--panel-raised))] px-4 py-2 text-sm text-muted-foreground transition-colors hover:border-primary/45 hover:text-foreground"
             >
               <Icon className="h-3.5 w-3.5 text-primary" />
@@ -89,11 +94,10 @@ export function ChatInput({
           <Textarea
             ref={textareaRef}
             value={input}
-            onChange={onInputChange}
+            onChange={(e) => onInputChange(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder={placeholder}
             rows={1}
-            disabled={isLoading}
             className={cn(
               "max-h-[200px] min-h-[48px] flex-1 resize-none border-0 bg-transparent",
               "px-3 py-3 text-base leading-relaxed shadow-none",
@@ -115,9 +119,8 @@ export function ChatInput({
           </Button>
         </form>
 
-        <div className="font-rune mt-3 flex items-center justify-between text-[0.62rem] text-[hsl(var(--ink-faint))] md:text-[0.68rem]">
-          <span>↵ enviar · ⇧↵ nova linha · ⌘K comandos</span>
-          <span className="hidden font-body italic md:inline">“verifique no livro antes de aplicar”</span>
+        <div className="mt-3 flex items-center justify-center text-[0.62rem] text-[hsl(var(--ink-faint))] md:text-[0.8rem]">
+          <span className="font-body italic uppercase tracking-wider">“verifique no livro antes de aplicar”</span>
         </div>
       </div>
     </div>

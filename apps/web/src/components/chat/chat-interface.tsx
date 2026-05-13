@@ -4,7 +4,8 @@ import { useEffect, useState } from "react";
 import { useChat } from "ai/react";
 import { MessageList } from "./message-list";
 import { ChatInput } from "./chat-input";
-import { BookOpen, Share2, Sparkles } from "lucide-react";
+import { BookOpen, Sparkles } from "lucide-react";
+import { HeaderUserMenu } from "@/components/shared/header-user-menu";
 
 interface InitialMessage {
   id: string;
@@ -16,9 +17,14 @@ interface ChatInterfaceProps {
   conversationId?: string;
   title?: string;
   initialMessages?: InitialMessage[];
+  user?: {
+    name?: string | null;
+    email?: string | null;
+    image?: string | null;
+  };
 }
 
-export function ChatInterface({ conversationId, title, initialMessages = [] }: ChatInterfaceProps) {
+export function ChatInterface({ conversationId, title, initialMessages = [], user }: ChatInterfaceProps) {
   const [supplementsEnabled, setSupplementsEnabled] = useState(true);
   const [activeConversationId, setActiveConversationId] = useState(conversationId);
 
@@ -26,7 +32,7 @@ export function ChatInterface({ conversationId, title, initialMessages = [] }: C
     setActiveConversationId(conversationId);
   }, [conversationId]);
 
-  const { messages, input, handleInputChange, handleSubmit, isLoading, error } = useChat({
+  const { messages, input, setInput, handleInputChange, handleSubmit, isLoading, error } = useChat({
     api: "/api/chat",
     initialMessages,
     body: {
@@ -50,29 +56,28 @@ export function ChatInterface({ conversationId, title, initialMessages = [] }: C
       <header className="relative flex shrink-0 items-center justify-between gap-6 border-b border-border/70 px-5 py-5 md:px-8 md:py-6">
         <div className="min-w-0">
           <div className="font-rune mb-2 flex items-center gap-2 text-[0.68rem] uppercase tracking-[0.28em]">
-            <span className="text-primary">Conversa</span>
+            <span className="text-primary">Consulta</span>
             <span className="h-1 w-1 rotate-45 bg-primary" />
-            <span className="truncate text-[hsl(var(--ink-faint))]">Magias e regras</span>
+            <span className="truncate text-[hsl(var(--ink-faint))]">Grimório AI — Especialista em Tormenta 20</span>
           </div>
           <h1 className="font-display max-w-3xl truncate text-2xl font-semibold uppercase leading-tight tracking-[0.04em] text-foreground md:text-4xl">
-            {title || "Nova consulta ao Grimório"}
+            {title || "Nova consulta aos tomos"}
           </h1>
         </div>
 
-        <div className="hidden shrink-0 items-center gap-3 md:flex">
-          <div className="flex items-center gap-2 rounded-xl border border-border/70 bg-[hsl(var(--panel-raised))] px-4 py-2">
-            <span className="h-2 w-2 rounded-full bg-primary shadow-[0_0_14px_hsl(var(--primary))]" />
-            <span className="font-rune text-xs text-muted-foreground">T20 · Básico v1.4</span>
+        {user && (
+          <div className="hidden shrink-0 md:block">
+            <HeaderUserMenu user={user} />
           </div>
-          <button className="flex items-center gap-2 rounded-xl border border-border/70 bg-transparent px-4 py-2 text-sm text-muted-foreground transition-colors hover:border-primary/45 hover:text-foreground">
-            <Share2 className="h-4 w-4" />
-            Compartilhar
-          </button>
-        </div>
+        )}
       </header>
 
       <div className="relative flex-1 overflow-y-auto">
-        <MessageList messages={messages} isLoading={isLoading} />
+        <MessageList 
+          messages={messages} 
+          isLoading={isLoading} 
+          onCardClick={(text) => setInput(text)}
+        />
       </div>
 
       {error && (
@@ -98,7 +103,7 @@ export function ChatInterface({ conversationId, title, initialMessages = [] }: C
       <ChatInput
         input={input}
         isLoading={isLoading}
-        onInputChange={handleInputChange}
+        onInputChange={setInput}
         onSubmit={handleSubmit}
         supplementsEnabled={supplementsEnabled}
         onSupplementsToggle={setSupplementsEnabled}

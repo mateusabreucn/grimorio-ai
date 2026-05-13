@@ -13,9 +13,10 @@ interface ChatMessage {
 interface MessageListProps {
   messages: ChatMessage[]
   isLoading: boolean
+  onCardClick?: (text: string) => void
 }
 
-export function MessageList({ messages, isLoading }: MessageListProps) {
+export function MessageList({ messages, isLoading, onCardClick }: MessageListProps) {
   const bottomRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -46,12 +47,13 @@ export function MessageList({ messages, isLoading }: MessageListProps) {
 
         <div className="grid w-full max-w-2xl gap-3 md:grid-cols-3">
           {[
-            { text: "Explicar regra", icon: "cap. 4" },
-            { text: "Sugerir build", icon: "nível 6" },
-            { text: "Gerar encontro", icon: "ND alvo" },
+            { text: "Como funciona o teste de resistência?", icon: "Regras" },
+            { text: "Me sugira uma build de Guerreiro focado em crítico.", icon: "Builds" },
+            { text: "Quais são as divindades de Arton para um Clérigo?", icon: "Lore" },
           ].map((q) => (
             <div
               key={q.text}
+              onClick={() => onCardClick?.(q.text)}
               className="group cursor-pointer rounded-2xl border border-border/70 bg-[hsl(var(--panel-raised))] p-4 text-left transition-all hover:-translate-y-0.5 hover:border-primary/45 hover:shadow-[0_18px_45px_-32px_hsl(var(--primary))]"
             >
               <div className="font-rune mb-3 text-[0.65rem] uppercase tracking-[0.2em] text-primary">{q.icon}</div>
