@@ -1,0 +1,125 @@
+[
+  {
+    "id": "enum-classes",
+    "category": "enumeration",
+    "question": "Quais classes existem em Tormenta 20?",
+    "expected": "Deve listar as 14 classes do Livro Básico: Arcanista, Bárbaro, Bardo, Bucaneiro, Caçador, Cavaleiro, Clérigo, Druida, Guerreiro, Inventor, Ladino, Lutador, Nobre, Paladino. Se citar suplementos (Heróis de Arton), deve separar claramente. NÃO pode inventar classes.",
+    "notes": "Antes da hybrid: completava com hallucination quando faltavam chunks"
+  },
+  {
+    "id": "enum-races",
+    "category": "enumeration",
+    "question": "Quais raças estão disponíveis para personagens?",
+    "expected": "Deve listar as raças do Livro Básico (humano, anão, elfo, halfling, qareen, dahllan, goblin, golem, hynne, kliren, lefou, medusa, minotauro, osteon, sereia, sílfide, suraggel, trogloide). Não inventar.",
+    "notes": "Enumeração ampla — similar ao caso das classes"
+  },
+  {
+    "id": "item-essencia-mana",
+    "category": "specific-item",
+    "question": "Quanto custa uma essência de mana?",
+    "expected": "Deve responder T$ 50, ocupa 0,5 espaços (Livro Básico, pg 156). Descrição: poção que recupera 1d4 PM, ação padrão (Livro Básico, pg 160).",
+    "notes": "Caso crítico do lexical: nome próprio em tabela longa"
+  },
+  {
+    "id": "item-balsamo",
+    "category": "specific-item",
+    "question": "O que é o bálsamo restaurador e qual o preço?",
+    "expected": "Deve informar preço (T$ 10) e descrição funcional. Citar página correta após o fix de offset.",
+    "notes": "Outro item nomeado"
+  },
+  {
+    "id": "spell-salto",
+    "category": "specific-spell",
+    "question": "Como funciona a magia salto dimensional?",
+    "expected": "Salto Dimensional: teleporte para um local dentro do alcance, alcance curto, alvo: você, duração instantânea. NÃO confundir com Viagem Planar ou outras magias de teleporte.",
+    "notes": "Caso crítico: antes descrevia outra magia (viagem planar)"
+  },
+  {
+    "id": "spell-cure",
+    "category": "specific-spell",
+    "question": "Quais magias de cura existem para um clérigo iniciante?",
+    "expected": "Listar magias divinas de cura disponíveis em níveis baixos (Curar Ferimentos, etc.) com referência ao livro. Não inventar magias.",
+    "notes": "Recomendação baseada nos livros"
+  },
+  {
+    "id": "rule-descanso",
+    "category": "rules-mapping",
+    "question": "Quanto custa o descanso luxuoso?",
+    "expected": "Reconhecer 'descanso luxuoso' como 'hospedagem luxuosa'. Informar preço por noite e recuperação de 3 PV e 3 PM por nível (Livro Básico, pg 169 após fix). Disponível apenas nas melhores estalagens.",
+    "notes": "Caso crítico de vocabulário coloquial → canônico"
+  },
+  {
+    "id": "rule-descansar",
+    "category": "rules-general",
+    "question": "Qual a forma de descansar no jogo?",
+    "expected": "Deve focar em hospedagem (Comum/Confortável/Luxuosa) com recuperação correspondente. NÃO deve trazer regras adjacentes (ex: lesões) a menos que sejam parte direta.",
+    "notes": "Antes trazia lesões e bases sem foco"
+  },
+  {
+    "id": "rule-iniciativa",
+    "category": "rules-combat",
+    "question": "Como funciona a iniciativa em combate?",
+    "expected": "Teste de Iniciativa, atributo, ordem de turnos. Citar página."
+  },
+  {
+    "id": "rule-acoes",
+    "category": "rules-combat",
+    "question": "Quais são as ações disponíveis em um turno?",
+    "expected": "Ação padrão, ação de movimento, ação livre, reação. Citar páginas."
+  },
+  {
+    "id": "build-melee",
+    "category": "recommendation",
+    "question": "Que classe é boa para combate corpo a corpo para iniciante?",
+    "expected": "Recomendar Guerreiro, Bárbaro ou Lutador com justificativa baseada em habilidades dos livros. Não inventar atributos.",
+    "notes": "Recomendação fundamentada"
+  },
+  {
+    "id": "casual-greeting",
+    "category": "casual",
+    "question": "Olá, tudo bem?",
+    "expected": "Resposta natural de saudação, sem consultar livros. needsSearch=false esperado.",
+    "notes": "Conversa casual"
+  },
+  {
+    "id": "casual-meta",
+    "category": "casual",
+    "question": "Quem é você?",
+    "expected": "Apresentação como Grimório, sábio de Tormenta 20. Sem consultar livros. needsSearch=false.",
+    "notes": "Meta-pergunta"
+  },
+  {
+    "id": "casual-thanks",
+    "category": "casual",
+    "question": "Obrigado!",
+    "expected": "Resposta natural de agradecimento. needsSearch=false.",
+    "notes": "Agradecimento"
+  },
+  {
+    "id": "exists-necromante",
+    "category": "specific-class",
+    "question": "Existe uma classe chamada Necromante em Tormenta 20?",
+    "expected": "Necromante é classe variante do Arcanista, apresentada em Heróis de Arton. Deve descrever Caminho do Necromante, Falar com Mortos, Animar Cadáver e outras habilidades com páginas corretas. NÃO inventar.",
+    "notes": "Variante de classe — antes o golden test estava errado"
+  },
+  {
+    "id": "nonexistent-zeus",
+    "category": "edge-case",
+    "question": "Quem é Zeus no panteão de Arton?",
+    "expected": "Zeus é divindade da mitologia grega, NÃO faz parte do panteão de Arton. A resposta deve dizer claramente que Zeus não existe nos livros de Tormenta 20. Pode sugerir Khalmyr (justiça/ordem, papel similar como líder do panteão) como alternativa relacionada, sempre deixando claro que a equivalência não vem dos livros. NÃO inventar.",
+    "notes": "Teste de honestidade — pergunta sobre algo realmente inexistente"
+  },
+  {
+    "id": "lore-reinado",
+    "category": "lore",
+    "question": "O que é o Reinado em Tormenta?",
+    "expected": "Reinado = conjunto de reinos centrais de Arton onde se passam aventuras. Citação correta dos livros."
+  },
+  {
+    "id": "specific-divinity",
+    "category": "specific-divinity",
+    "question": "Quem é Khalmyr e o que ele representa?",
+    "expected": "Khalmyr: deus da justiça, da lei, da honra. Detalhes do panteão (Deuses de Arton). Não confundir com outros deuses.",
+    "notes": "Divindade específica"
+  }
+]
