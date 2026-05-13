@@ -21,6 +21,7 @@ export default async function ConversationPage({ params }: ConversationPageProps
   return (
     <ChatInterface
       conversationId={conversation.id}
+      title={conversation.title}
       initialMessages={initialMessages}
     />
   )

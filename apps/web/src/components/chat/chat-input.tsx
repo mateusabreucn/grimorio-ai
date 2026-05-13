@@ -3,7 +3,8 @@
 import { type FormEvent, useRef, useEffect } from "react"
 import { Textarea } from "@/components/ui/textarea"
 import { Button } from "@/components/ui/button"
-import { SendHorizontal, Loader2 } from "lucide-react"
+import { Switch } from "@/components/ui/switch"
+import { Box, BookOpen, Loader2, Search, SendHorizontal, Sparkles } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 interface ChatInputProps {
@@ -12,6 +13,8 @@ interface ChatInputProps {
   onInputChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => void
   onSubmit: (e: FormEvent<HTMLFormElement>) => void
   placeholder?: string
+  supplementsEnabled?: boolean
+  onSupplementsToggle?: (enabled: boolean) => void
 }
 
 export function ChatInput({
@@ -19,7 +22,9 @@ export function ChatInput({
   isLoading,
   onInputChange,
   onSubmit,
-  placeholder = "Pergunte sobre classes, builds, regras...",
+  placeholder = "Pergunte ao Grimório...",
+  supplementsEnabled = true,
+  onSupplementsToggle,
 }: ChatInputProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
@@ -40,36 +45,81 @@ export function ChatInput({
   }
 
   return (
-    <div className="border-t bg-background/80 backdrop-blur-sm px-4 py-3">
-      <form onSubmit={onSubmit} className="flex items-end gap-2 max-w-3xl mx-auto">
-        <Textarea
-          ref={textareaRef}
-          value={input}
-          onChange={onInputChange}
-          onKeyDown={handleKeyDown}
-          placeholder={placeholder}
-          rows={1}
-          disabled={isLoading}
-          className={cn(
-            "resize-none min-h-[46px] max-h-[200px] flex-1",
-            "rounded-xl border-border/60 bg-card focus-visible:ring-primary/30",
-            "py-3 px-4 text-sm leading-relaxed",
+    <div className="relative border-t border-border/70 bg-background/80 px-4 py-4 backdrop-blur md:px-8 md:py-5">
+      <div className="mx-auto max-w-5xl">
+        <div className="mb-3 flex flex-wrap items-center gap-2">
+          {[
+            { label: "Rolar iniciativa", icon: Box },
+            { label: "Explicar perícia", icon: BookOpen },
+            { label: "Gerar NPC", icon: Sparkles },
+            { label: "Sugerir loot", icon: Search },
+          ].map(({ label, icon: Icon }) => (
+            <button
+              key={label}
+              type="button"
+              className="flex items-center gap-2 rounded-full border border-border/70 bg-[hsl(var(--panel-raised))] px-4 py-2 text-sm text-muted-foreground transition-colors hover:border-primary/45 hover:text-foreground"
+            >
+              <Icon className="h-3.5 w-3.5 text-primary" />
+              {label}
+            </button>
+          ))}
+
+          {onSupplementsToggle && (
+            <div className="ml-auto flex items-center gap-2 rounded-full border border-border/70 bg-[hsl(var(--panel-raised))] px-3 py-1.5">
+              <label
+                htmlFor="supplements-toggle"
+                className="font-rune cursor-pointer select-none text-[0.65rem] uppercase tracking-[0.18em] text-muted-foreground"
+              >
+                {supplementsEnabled ? "Todos os livros" : "Básico"}
+              </label>
+              <Switch
+                id="supplements-toggle"
+                checked={supplementsEnabled}
+                onCheckedChange={onSupplementsToggle}
+                className="scale-75"
+              />
+            </div>
           )}
-        />
-        <Button
-          type="submit"
-          size="icon"
-          disabled={isLoading || !input.trim()}
-          className="shrink-0 h-[46px] w-[46px] rounded-xl bg-primary hover:bg-primary/90"
+        </div>
+
+        <form
+          onSubmit={onSubmit}
+          className="flex items-end gap-3 rounded-2xl border border-primary/25 bg-[hsl(var(--panel))] p-3 shadow-[0_0_0_4px_hsl(var(--amber-glow)),0_20px_60px_-45px_hsl(var(--primary))]"
         >
-          {isLoading ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <SendHorizontal className="h-4 w-4" />
-          )}
-          <span className="sr-only">Enviar</span>
-        </Button>
-      </form>
+          <Textarea
+            ref={textareaRef}
+            value={input}
+            onChange={onInputChange}
+            onKeyDown={handleKeyDown}
+            placeholder={placeholder}
+            rows={1}
+            disabled={isLoading}
+            className={cn(
+              "max-h-[200px] min-h-[48px] flex-1 resize-none border-0 bg-transparent",
+              "px-3 py-3 text-base leading-relaxed shadow-none",
+              "placeholder:text-muted-foreground/80 focus-visible:ring-0 focus-visible:ring-offset-0",
+            )}
+          />
+          <Button
+            type="submit"
+            size="icon"
+            disabled={isLoading || !input.trim()}
+            className="h-12 w-12 shrink-0 rounded-xl bg-gradient-to-br from-primary to-[hsl(var(--amber-deep))] text-primary-foreground shadow-[0_10px_28px_-16px_hsl(var(--primary))] hover:opacity-95"
+          >
+            {isLoading ? (
+              <Loader2 className="h-5 w-5 animate-spin" />
+            ) : (
+              <SendHorizontal className="h-5 w-5" />
+            )}
+            <span className="sr-only">Enviar</span>
+          </Button>
+        </form>
+
+        <div className="font-rune mt-3 flex items-center justify-between text-[0.62rem] text-[hsl(var(--ink-faint))] md:text-[0.68rem]">
+          <span>↵ enviar · ⇧↵ nova linha · ⌘K comandos</span>
+          <span className="hidden font-body italic md:inline">“verifique no livro antes de aplicar”</span>
+        </div>
+      </div>
     </div>
   )
 }

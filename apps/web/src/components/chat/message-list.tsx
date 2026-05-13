@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react"
 import { MessageBubble } from "./message-bubble"
-import { Sparkles } from "lucide-react"
+import { Compass, Sparkles } from "lucide-react"
 
 interface ChatMessage {
   id: string
@@ -24,35 +24,38 @@ export function MessageList({ messages, isLoading }: MessageListProps) {
 
   if (messages.length === 0 && !isLoading) {
     return (
-      <div className="flex flex-col items-center justify-center h-full text-center px-6 gap-6">
-        {/* Logo grande */}
+      <div className="mx-auto flex h-full max-w-4xl flex-col items-center justify-center gap-8 px-8 text-center">
         <div className="relative">
-          <div className="flex items-center justify-center w-20 h-20 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 border border-primary/10">
-            <Sparkles className="w-10 h-10 text-primary" />
+          <div className="flex h-24 w-24 items-center justify-center rounded-[1.75rem] border border-primary/35 bg-primary/10 shadow-[0_0_60px_hsl(var(--amber-glow))]">
+            <Compass className="h-12 w-12 text-primary" />
           </div>
-          <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-primary/20 border-2 border-background" />
+          <div className="absolute -bottom-2 -right-2 flex h-8 w-8 items-center justify-center rounded-full border-2 border-background bg-primary text-primary-foreground">
+            <Sparkles className="h-4 w-4" />
+          </div>
         </div>
 
-        <div className="space-y-2">
-          <h2 className="text-xl font-bold">Grimório AI</h2>
-          <p className="text-sm text-muted-foreground max-w-xs leading-relaxed">
+        <div className="space-y-3">
+          <p className="font-rune text-[0.72rem] uppercase tracking-[0.34em] text-primary">
+            Mestre de tomos
+          </p>
+          <h2 className="font-display text-4xl font-semibold uppercase tracking-[0.06em]">Grimório AI</h2>
+          <p className="mx-auto max-w-xl text-lg leading-relaxed text-muted-foreground">
             Consulte regras, classes, builds e estratégias dos livros de Tormenta 20.
           </p>
         </div>
 
-        {/* Sugestões */}
-        <div className="grid gap-2 w-full max-w-md mt-2">
+        <div className="grid w-full max-w-2xl gap-3 md:grid-cols-3">
           {[
-            { text: "Quais são as classes disponíveis?", icon: "⚔️" },
-            { text: "Qual é o melhor build para iniciantes?", icon: "🛡️" },
-            { text: "Como funciona o sistema de magia?", icon: "✨" },
+            { text: "Explicar regra", icon: "cap. 4" },
+            { text: "Sugerir build", icon: "nível 6" },
+            { text: "Gerar encontro", icon: "ND alvo" },
           ].map((q) => (
             <div
               key={q.text}
-              className="flex items-center gap-3 rounded-xl border border-border/60 bg-card px-4 py-3 text-sm text-left text-muted-foreground hover:text-foreground hover:border-primary/20 hover:bg-accent/50 cursor-pointer transition-all"
+              className="group cursor-pointer rounded-2xl border border-border/70 bg-[hsl(var(--panel-raised))] p-4 text-left transition-all hover:-translate-y-0.5 hover:border-primary/45 hover:shadow-[0_18px_45px_-32px_hsl(var(--primary))]"
             >
-              <span className="text-base shrink-0">{q.icon}</span>
-              <span>{q.text}</span>
+              <div className="font-rune mb-3 text-[0.65rem] uppercase tracking-[0.2em] text-primary">{q.icon}</div>
+              <div className="text-sm font-semibold text-foreground">{q.text}</div>
             </div>
           ))}
         </div>
@@ -61,7 +64,7 @@ export function MessageList({ messages, isLoading }: MessageListProps) {
   }
 
   return (
-    <div className="flex flex-col py-2">
+    <div className="flex flex-col py-6">
       {messages.map((msg) => (
         <MessageBubble
           key={msg.id}
@@ -70,13 +73,15 @@ export function MessageList({ messages, isLoading }: MessageListProps) {
         />
       ))}
 
-      {/* Typing indicator animado */}
       {isLoading && (
-        <div className="flex gap-3 px-4 py-4">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-primary/20 to-primary/5 border border-primary/10">
-            <Sparkles className="h-4 w-4 text-primary" />
+        <div className="mx-auto flex w-full max-w-5xl gap-4 px-4 py-5 md:px-6">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-primary/35 bg-[hsl(var(--panel-raised))]">
+            <Compass className="h-5 w-5 text-primary" />
           </div>
-          <div className="bg-card border border-border/60 rounded-2xl rounded-tl-md px-4 py-3 flex items-center gap-1.5">
+          <div className="flex items-center gap-2 rounded-2xl rounded-tl-md border border-border/70 bg-[hsl(var(--panel-raised))] px-5 py-4">
+            <span className="font-rune mr-2 text-[0.68rem] uppercase tracking-[0.2em] text-muted-foreground">
+              consultando
+            </span>
             <span className="typing-dot h-1.5 w-1.5 rounded-full bg-primary/50" />
             <span className="typing-dot h-1.5 w-1.5 rounded-full bg-primary/50" />
             <span className="typing-dot h-1.5 w-1.5 rounded-full bg-primary/50" />

@@ -1,9 +1,8 @@
 "use client"
 
-import { useState } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { MessageSquare, Plus, ChevronDown } from "lucide-react"
+import { MessageSquare, Plus, Search } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 interface Conversation {
@@ -13,62 +12,79 @@ interface Conversation {
 
 export function ChatNav({ conversations }: { conversations: Conversation[] }) {
   const pathname = usePathname()
-  const [open, setOpen] = useState(pathname.startsWith("/chat"))
+  const visibleConversations = conversations.slice(0, 9)
 
   return (
-    <div>
-      {/* Botão principal do dropdown */}
-      <button
-        onClick={() => setOpen(!open)}
+    <div className="space-y-4">
+      <Link
+        href="/chat"
         className={cn(
-          "w-full flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm font-medium",
-          "text-foreground hover:bg-accent/60 transition-colors",
-          pathname.startsWith("/chat") && "bg-accent/40",
+          "group flex items-center gap-3 rounded-xl border border-primary/35 px-4 py-3 text-sm font-semibold",
+          "bg-transparent text-foreground shadow-[0_0_0_1px_hsl(var(--amber-glow))] transition-all",
+          "hover:border-primary/60 hover:bg-primary/10",
+          pathname === "/chat" && "border-primary/60 bg-primary/10",
         )}
       >
-        <MessageSquare className="w-4 h-4 shrink-0 text-primary" />
-        <span className="flex-1 text-left">Chat</span>
-        <ChevronDown
-          className={cn(
-            "w-3.5 h-3.5 text-muted-foreground transition-transform",
-            open && "rotate-180",
+        <Plus className="h-4 w-4 text-primary transition-transform group-hover:rotate-90" />
+        <span className="flex-1">Nova conversa</span>
+        <span className="font-rune rounded border border-border/70 bg-background/40 px-1.5 py-0.5 text-[0.62rem] text-muted-foreground">
+          ⌘N
+        </span>
+      </Link>
+
+      <div className="flex items-center gap-2 rounded-xl border border-border/70 bg-[hsl(var(--panel-raised))] px-3 py-2.5 text-muted-foreground">
+        <Search className="h-4 w-4" />
+        <span className="text-sm">Buscar nos tomos...</span>
+      </div>
+
+      <div>
+        <SectionTitle>Hoje</SectionTitle>
+        <div className="space-y-1">
+          {visibleConversations.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-border/80 px-3 py-4 text-sm leading-relaxed text-muted-foreground">
+              Nenhuma conversa gravada ainda. Comece uma consulta ao Grimório.
+            </div>
+          ) : (
+            visibleConversations.map((conv, index) => {
+              const active = pathname === `/chat/${conv.id}`
+              return (
+                <Link
+                  key={conv.id}
+                  href={`/chat/${conv.id}`}
+                  className={cn(
+                    "group relative block rounded-r-xl border-l-2 px-3 py-3 transition-all",
+                    active
+                      ? "border-primary bg-[linear-gradient(90deg,hsl(var(--amber-glow)),transparent_92%)] text-foreground"
+                      : "border-transparent text-muted-foreground hover:border-primary/45 hover:bg-[hsl(var(--panel-raised))] hover:text-foreground",
+                  )}
+                >
+                  <div className="flex items-start gap-2.5">
+                    <MessageSquare className="mt-0.5 h-4 w-4 shrink-0 text-primary/70" />
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-sm font-semibold">{conv.title || "Conversa sem título"}</div>
+                      <div className="mt-1 truncate text-xs text-[hsl(var(--ink-faint))]">
+                        Consulta registrada no tomo {index + 1}
+                      </div>
+                    </div>
+                  </div>
+                </Link>
+              )
+            })
           )}
-        />
-      </button>
-
-      {/* Dropdown aberto */}
-      {open && (
-        <div className="ml-2 mt-0.5 space-y-0.5 border-l border-border/60 pl-3">
-          <Link
-            href="/chat"
-            className={cn(
-              "flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm",
-              "text-muted-foreground hover:text-foreground hover:bg-accent/40",
-              "transition-colors",
-              pathname === "/chat" && "text-foreground bg-accent/30",
-            )}
-          >
-            <Plus className="w-3.5 h-3.5 shrink-0" />
-            <span>Nova conversa</span>
-          </Link>
-
-          {conversations.map((conv) => (
-            <Link
-              key={conv.id}
-              href={`/chat/${conv.id}`}
-              className={cn(
-                "flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm",
-                "text-muted-foreground hover:text-foreground hover:bg-accent/40",
-                "transition-colors",
-                pathname === `/chat/${conv.id}` && "text-foreground bg-accent/30",
-              )}
-            >
-              <MessageSquare className="w-3.5 h-3.5 shrink-0 opacity-40" />
-              <span className="truncate">{conv.title}</span>
-            </Link>
-          ))}
         </div>
-      )}
+      </div>
+    </div>
+  )
+}
+
+function SectionTitle({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="mb-2 flex items-center gap-2 px-1">
+      <span className="h-1.5 w-1.5 rotate-45 bg-primary" />
+      <span className="font-rune text-[0.64rem] uppercase tracking-[0.32em] text-[hsl(var(--ink-faint))]">
+        {children}
+      </span>
+      <span className="h-px flex-1 bg-border/80" />
     </div>
   )
 }

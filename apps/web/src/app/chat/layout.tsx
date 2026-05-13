@@ -1,7 +1,6 @@
 import type { Metadata } from "next"
 import { auth } from "@/lib/auth"
 import { Sidebar } from "@/components/sidebar/sidebar"
-import { Navbar } from "@/components/shared/navbar"
 import { ThemeToggle } from "@/components/shared/theme-toggle"
 import { Sparkles, LogIn } from "lucide-react"
 import Link from "next/link"
@@ -15,19 +14,9 @@ export default async function ChatLayout({ children }: { children: React.ReactNo
 
   if (user?.id) {
     return (
-      <div className="flex h-screen overflow-hidden bg-background">
+      <div className="flex h-screen overflow-hidden bg-background text-foreground">
         <Sidebar />
-        <div className="flex flex-col flex-1 overflow-hidden">
-          <Navbar
-            user={{
-              id: user.id,
-              name: user.name,
-              email: user.email,
-              image: user.image,
-            }}
-          />
-          <main className="flex-1 overflow-hidden">{children}</main>
-        </div>
+        <main className="flex-1 overflow-hidden">{children}</main>
       </div>
     )
   }

@@ -4,48 +4,63 @@
 
 @layer base {
   :root {
-    --background: 30 20% 96%;
-    --foreground: 20 10% 12%;
-    --card: 30 18% 94%;
-    --card-foreground: 20 10% 12%;
-    --popover: 30 18% 94%;
-    --popover-foreground: 20 10% 12%;
-    --primary: 24 75% 45%;
-    --primary-foreground: 30 20% 98%;
-    --secondary: 30 12% 88%;
-    --secondary-foreground: 20 10% 20%;
-    --muted: 30 10% 88%;
-    --muted-foreground: 30 6% 45%;
-    --accent: 24 60% 88%;
-    --accent-foreground: 20 10% 15%;
+    --background: 42 42% 94%;
+    --foreground: 32 20% 13%;
+    --card: 42 39% 89%;
+    --card-foreground: 32 20% 13%;
+    --popover: 42 39% 91%;
+    --popover-foreground: 32 20% 13%;
+    --primary: 39 81% 42%;
+    --primary-foreground: 42 45% 96%;
+    --secondary: 40 31% 84%;
+    --secondary-foreground: 32 18% 18%;
+    --muted: 40 27% 84%;
+    --muted-foreground: 35 12% 44%;
+    --accent: 39 63% 78%;
+    --accent-foreground: 32 23% 13%;
     --destructive: 0 72% 50%;
     --destructive-foreground: 30 20% 98%;
-    --border: 30 12% 86%;
-    --input: 30 12% 86%;
-    --ring: 24 75% 45%;
-    --radius: 0.75rem;
+    --border: 38 26% 78%;
+    --input: 38 26% 78%;
+    --ring: 39 81% 42%;
+    --radius: 0.65rem;
+    --amber: 39 81% 49%;
+    --amber-deep: 38 86% 32%;
+    --amber-glow: 39 81% 49% / 0.18;
+    --panel: 42 36% 88%;
+    --panel-raised: 42 40% 92%;
+    --ink-faint: 38 13% 56%;
+    --font-display: "Cinzel", "Cormorant Garamond", "Iowan Old Style", "Palatino Linotype", serif;
+    --font-body: "Spectral", "Libre Baskerville", "Iowan Old Style", Georgia, serif;
+    --font-mono: "IBM Plex Mono", "SFMono-Regular", "Cascadia Mono", monospace;
   }
 
   .dark {
-    --background: 20 14% 6%;
-    --foreground: 20 10% 92%;
-    --card: 20 14% 9%;
-    --card-foreground: 20 10% 92%;
-    --popover: 20 14% 9%;
-    --popover-foreground: 20 10% 92%;
-    --primary: 24 85% 55%;
-    --primary-foreground: 20 14% 6%;
-    --secondary: 20 12% 13%;
-    --secondary-foreground: 20 10% 85%;
-    --muted: 20 10% 13%;
-    --muted-foreground: 20 8% 50%;
-    --accent: 24 40% 14%;
-    --accent-foreground: 24 85% 65%;
+    --background: 42 22% 4%;
+    --foreground: 42 20% 88%;
+    --card: 40 16% 9%;
+    --card-foreground: 42 20% 88%;
+    --popover: 40 16% 9%;
+    --popover-foreground: 42 20% 88%;
+    --primary: 42 92% 57%;
+    --primary-foreground: 38 24% 8%;
+    --secondary: 39 13% 14%;
+    --secondary-foreground: 42 19% 82%;
+    --muted: 39 11% 13%;
+    --muted-foreground: 38 8% 53%;
+    --accent: 39 48% 15%;
+    --accent-foreground: 42 92% 65%;
     --destructive: 0 62% 48%;
     --destructive-foreground: 20 10% 92%;
-    --border: 20 12% 16%;
-    --input: 20 12% 16%;
-    --ring: 24 85% 55%;
+    --border: 40 13% 17%;
+    --input: 40 13% 17%;
+    --ring: 42 92% 57%;
+    --amber: 42 92% 57%;
+    --amber-deep: 39 80% 42%;
+    --amber-glow: 42 92% 57% / 0.18;
+    --panel: 42 16% 7%;
+    --panel-raised: 40 14% 11%;
+    --ink-faint: 42 9% 46%;
   }
 }
 
@@ -55,6 +70,11 @@
   }
   body {
     @apply bg-background text-foreground;
+    font-family: var(--font-body);
+    font-feature-settings: "kern";
+    background:
+      radial-gradient(ellipse 80% 45% at 55% 0%, hsl(var(--amber-glow)), transparent 70%),
+      hsl(var(--background));
   }
 }
 
@@ -80,3 +100,15 @@
 }
 .typing-dot:nth-child(2) { animation-delay: 0.2s; }
 .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+
+.font-display {
+  font-family: var(--font-display);
+}
+
+.font-body {
+  font-family: var(--font-body);
+}
+
+.font-rune {
+  font-family: var(--font-mono);
+}
