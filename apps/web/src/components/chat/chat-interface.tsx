@@ -53,26 +53,26 @@ export function ChatInterface({ conversationId, title, initialMessages = [], use
     <div className="relative flex h-full flex-col overflow-hidden bg-background">
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_80%_50%_at_50%_0%,hsl(var(--amber-glow)),transparent_70%)]" />
 
-      <header className="relative flex shrink-0 items-center justify-between gap-6 border-b border-border/70 px-5 py-5 md:px-8 md:py-6">
-        <div className="min-w-0">
-          <div className="font-rune mb-2 flex items-center gap-2 text-[0.68rem] uppercase tracking-[0.28em]">
+      <header className="relative flex shrink-0 items-center justify-between gap-4 border-b border-border/70 px-5 py-4 md:px-8 md:py-6">
+        <div className="min-w-0 flex-1">
+          <div className="font-rune mb-1 flex items-center gap-2 text-[0.6rem] uppercase tracking-[0.2em] md:mb-2 md:text-[0.68rem] md:tracking-[0.28em]">
             <span className="text-primary">Consulta</span>
             <span className="h-1 w-1 rotate-45 bg-primary" />
-            <span className="truncate text-[hsl(var(--ink-faint))]">Grimório AI — Especialista em Tormenta 20</span>
+            <span className="truncate text-[hsl(var(--ink-faint))]">Grimório AI</span>
           </div>
-          <h1 className="font-display max-w-3xl truncate text-2xl font-semibold uppercase leading-tight tracking-[0.04em] text-foreground md:text-4xl">
-            {title || "Nova consulta aos tomos"}
+          <h1 className="font-display max-w-3xl truncate text-xl font-semibold uppercase leading-tight tracking-[0.04em] text-foreground md:text-4xl">
+            {title || "Nova consulta"}
           </h1>
         </div>
 
         {user && (
-          <div className="hidden shrink-0 md:block">
+          <div className="shrink-0">
             <HeaderUserMenu user={user} />
           </div>
         )}
       </header>
 
-      <div className="relative flex-1 overflow-y-auto">
+      <div className="relative flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-border">
         <MessageList 
           messages={messages} 
           isLoading={isLoading} 

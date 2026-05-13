@@ -10,7 +10,7 @@ export default async function AppLayout({
   const user = session?.user
 
   return (
-    <div className="flex h-screen overflow-hidden bg-background text-foreground">
+    <div className="flex h-[100dvh] overflow-hidden bg-background text-foreground">
       {user && <Sidebar />}
       <main className="flex-1 overflow-hidden">{children}</main>
     </div>

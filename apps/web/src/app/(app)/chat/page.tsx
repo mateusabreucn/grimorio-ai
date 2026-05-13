@@ -18,7 +18,7 @@ export default async function ChatPage() {
 
   // Versão pública (Guest Mode)
   return (
-    <div className="flex flex-col h-screen bg-background text-foreground">
+    <div className="flex flex-col h-[100dvh] bg-background text-foreground">
       <header className="h-20 border-b border-border/70 flex items-center justify-between px-6 md:px-10 shrink-0 bg-[hsl(var(--panel))]/50 backdrop-blur-md">
         <Link href="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-[hsl(var(--amber-deep))] shadow-[0_0_20px_hsl(var(--amber-glow))]">
