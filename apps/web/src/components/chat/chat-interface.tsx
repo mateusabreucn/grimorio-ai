@@ -72,7 +72,7 @@ export function ChatInterface({ conversationId, title, initialMessages = [], use
         )}
       </header>
 
-      <div className="relative flex-1 overflow-y-auto scrollbar scrollbar-w-1.5 scrollbar-thumb-border hover:scrollbar-thumb-muted-foreground/50">
+      <div className="relative flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-border hover:scrollbar-thumb-muted-foreground/50 scrollbar-track-transparent">
         <MessageList 
           messages={messages} 
           isLoading={isLoading} 
@@ -83,13 +83,6 @@ export function ChatInterface({ conversationId, title, initialMessages = [], use
       {error && (
         <div className="relative mx-8 mb-2 rounded-xl border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive">
           Erro ao conectar com o Grimório. Tente novamente.
-        </div>
-      )}
-
-      {messages.length > 0 && (
-        <div className="pointer-events-none absolute right-8 top-28 hidden rounded-full border border-primary/30 bg-primary/10 px-3 py-1.5 text-primary lg:flex">
-          <BookOpen className="mr-2 h-3.5 w-3.5" />
-          <span className="font-rune text-[0.65rem] uppercase tracking-[0.2em]">fontes ativas</span>
         </div>
       )}
 
