@@ -72,7 +72,7 @@ export function ChatInterface({ conversationId, title, initialMessages = [], use
         )}
       </header>
 
-      <div className="relative flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-border">
+      <div className="relative flex-1 overflow-y-auto scrollbar scrollbar-w-1.5 scrollbar-thumb-border hover:scrollbar-thumb-muted-foreground/50">
         <MessageList 
           messages={messages} 
           isLoading={isLoading} 
