@@ -28,26 +28,32 @@ logging.basicConfig(
 logger = logging.getLogger("ingest_books")
 
 # Mapeamento de livros: path relativo ao diretório rag-service/
+# page_offset = páginas de frontmatter (capa, contracapa, sumário) que precisam
+# ser descontadas para alinhar com a numeração impressa do livro.
 BOOKS = [
     {
         "path": "data/books/T20-Livro Básico.pdf",
         "id": "core",
         "title": "Tormenta 20 — Livro Básico",
+        "page_offset": 6,
     },
     {
         "path": "data/books/Ameacas-de-Arton.pdf",
         "id": "ameacas",
         "title": "Ameaças de Arton",
+        "page_offset": 2,
     },
     {
         "path": "data/books/T20-Deuses-de-Arton.pdf",
         "id": "deuses",
         "title": "Deuses de Arton",
+        "page_offset": 2,
     },
     {
         "path": "data/books/T20-Herois-de-Arton.pdf",
         "id": "herois",
         "title": "Heróis de Arton",
+        "page_offset": 2,
     },
 ]
 
@@ -96,6 +102,7 @@ async def ingest_all(skip_existing: bool = True) -> None:
                     pdf_path=pdf_path,
                     book_id=book["id"],
                     book_title=book["title"],
+                    page_offset=book.get("page_offset", 0),
                 )
                 total_saved += saved
             finally:

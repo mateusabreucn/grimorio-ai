@@ -28,24 +28,31 @@ _splitter = RecursiveCharacterTextSplitter(
 )
 
 
-def extract_pages(pdf_path: str | Path) -> list[dict]:
+def extract_pages(pdf_path: str | Path, page_offset: int = 0) -> list[dict]:
     """
     Extrai texto de cada página do PDF.
 
+    Args:
+        pdf_path: Caminho do PDF.
+        page_offset: Número de páginas de frontmatter a descontar para alinhar
+            com a numeração impressa do livro. Páginas com número <= 0 após o
+            ajuste recebem page_number=None (frontmatter).
+
     Returns:
-        Lista de dicts com keys: page_number (int), text (str).
+        Lista de dicts com keys: page_number (int|None), text (str).
     """
     pages = []
 
     with pdfplumber.open(str(pdf_path)) as pdf:
         total = len(pdf.pages)
-        logger.info("PDF com %d páginas: %s", total, pdf_path)
+        logger.info("PDF com %d páginas (offset=%d): %s", total, page_offset, pdf_path)
 
-        for page_num, page in enumerate(pdf.pages, start=1):
+        for pdf_page_num, page in enumerate(pdf.pages, start=1):
             text = page.extract_text()
             if text and text.strip():
+                printed = pdf_page_num - page_offset
                 pages.append({
-                    "page_number": page_num,
+                    "page_number": printed if printed > 0 else None,
                     "text": text.strip(),
                 })
 
@@ -81,6 +88,7 @@ async def ingest_pdf(
     pdf_path: str | Path,
     book_id: str,
     book_title: str,
+    page_offset: int = 0,
     batch_size: int = 10,
 ) -> int:
     """
@@ -91,12 +99,13 @@ async def ingest_pdf(
         pdf_path: Caminho para o arquivo PDF.
         book_id: Identificador único do livro (ex: "core").
         book_title: Título legível (ex: "Tormenta 20 — Livro Básico").
+        page_offset: Páginas de frontmatter a descontar (ver extract_pages).
         batch_size: Quantos chunks processar antes de logar progresso.
 
     Returns:
         Número de chunks ingeridos.
     """
-    pages = await asyncio.to_thread(extract_pages, pdf_path)
+    pages = await asyncio.to_thread(extract_pages, pdf_path, page_offset)
     chunks = await asyncio.to_thread(chunk_pages, pages)
 
     if not chunks:
