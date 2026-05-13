@@ -12,7 +12,6 @@ interface Conversation {
 
 export function ChatNav({ conversations }: { conversations: Conversation[] }) {
   const pathname = usePathname()
-  const visibleConversations = conversations.slice(0, 9)
 
   return (
     <div className="space-y-4">
@@ -26,10 +25,7 @@ export function ChatNav({ conversations }: { conversations: Conversation[] }) {
         )}
       >
         <Plus className="h-4 w-4 text-primary transition-transform group-hover:rotate-90" />
-        <span className="flex-1">Nova conversa</span>
-        <span className="font-rune rounded border border-border/70 bg-background/40 px-1.5 py-0.5 text-[0.62rem] text-muted-foreground">
-          ⌘N
-        </span>
+        <span className="flex-1">Nova consulta</span>
       </Link>
 
       <div className="flex items-center gap-2 rounded-xl border border-border/70 bg-[hsl(var(--panel-raised))] px-3 py-2.5 text-muted-foreground">
@@ -38,14 +34,14 @@ export function ChatNav({ conversations }: { conversations: Conversation[] }) {
       </div>
 
       <div>
-        <SectionTitle>Hoje</SectionTitle>
+        <SectionTitle>Histórico de Consultas</SectionTitle>
         <div className="space-y-1">
-          {visibleConversations.length === 0 ? (
+          {conversations.length === 0 ? (
             <div className="rounded-xl border border-dashed border-border/80 px-3 py-4 text-sm leading-relaxed text-muted-foreground">
               Nenhuma conversa gravada ainda. Comece uma consulta ao Grimório.
             </div>
           ) : (
-            visibleConversations.map((conv, index) => {
+            conversations.map((conv, index) => {
               const active = pathname === `/chat/${conv.id}`
               return (
                 <Link
@@ -62,9 +58,6 @@ export function ChatNav({ conversations }: { conversations: Conversation[] }) {
                     <MessageSquare className="mt-0.5 h-4 w-4 shrink-0 text-primary/70" />
                     <div className="min-w-0 flex-1">
                       <div className="truncate text-sm font-semibold">{conv.title || "Conversa sem título"}</div>
-                      <div className="mt-1 truncate text-xs text-[hsl(var(--ink-faint))]">
-                        Consulta registrada no tomo {index + 1}
-                      </div>
                     </div>
                   </div>
                 </Link>
