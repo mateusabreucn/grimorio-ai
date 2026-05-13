@@ -9,6 +9,9 @@ export const metadata: Metadata = {
   },
   description: "Seu assistente especialista em RPG — consulte regras, builds e estratégias dos livros.",
   keywords: ["RPG", "grimório", "inteligência artificial", "regras", "builds"],
+  icons: {
+    icon: "/favicon.svg",
+  },
 }
 
 export default function RootLayout({
