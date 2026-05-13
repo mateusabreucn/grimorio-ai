@@ -25,8 +25,8 @@ export function MessageList({ messages, isLoading, onCardClick }: MessageListPro
 
   if (messages.length === 0 && !isLoading) {
     return (
-      <div className="mx-auto flex h-full max-w-4xl flex-col items-center justify-center gap-8 px-8 text-center">
-        <div className="relative">
+      <div className="mx-auto flex min-h-full max-w-4xl flex-col items-center gap-8 px-6 pt-12 pb-24 md:py-12 md:px-8 text-center justify-start md:justify-center">
+        <div className="relative mt-8 md:mt-0">
           <div className="flex h-24 w-24 items-center justify-center rounded-[1.75rem] border border-primary/35 bg-primary/10 shadow-[0_0_60px_hsl(var(--amber-glow))]">
             <Compass className="h-12 w-12 text-primary" />
           </div>
