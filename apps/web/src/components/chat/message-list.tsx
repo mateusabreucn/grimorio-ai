@@ -14,9 +14,10 @@ interface MessageListProps {
   messages: ChatMessage[]
   isLoading: boolean
   onCardClick?: (text: string) => void
+  onReload?: () => void
 }
 
-export function MessageList({ messages, isLoading, onCardClick }: MessageListProps) {
+export function MessageList({ messages, isLoading, onCardClick, onReload }: MessageListProps) {
   const bottomRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -67,11 +68,13 @@ export function MessageList({ messages, isLoading, onCardClick }: MessageListPro
 
   return (
     <div className="flex flex-col py-6">
-      {messages.map((msg) => (
+      {messages.map((msg, index) => (
         <MessageBubble
           key={msg.id}
           role={msg.role as "user" | "assistant"}
           content={msg.content}
+          isLast={index === messages.length - 1}
+          onReload={onReload}
         />
       ))}
 

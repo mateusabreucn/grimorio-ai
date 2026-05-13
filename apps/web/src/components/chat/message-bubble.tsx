@@ -1,13 +1,39 @@
+"use client"
+
 import { cn } from "@/lib/utils"
-import { BookOpen, Compass, Copy, RotateCcw, Save, ThumbsDown, ThumbsUp } from "lucide-react"
+import { BookOpen, Compass, Copy, RotateCcw, Save, ThumbsDown, ThumbsUp, Check } from "lucide-react"
+import { useState } from "react"
+import { useToast } from "@/hooks/use-toast"
 
 interface MessageBubbleProps {
   role: "user" | "assistant"
   content: string
+  onReload?: () => void
+  isLast?: boolean
 }
 
-export function MessageBubble({ role, content }: MessageBubbleProps) {
+export function MessageBubble({ role, content, onReload, isLast }: MessageBubbleProps) {
   const isUser = role === "user"
+  const { toast } = useToast()
+  const [copied, setCopied] = useState(false)
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(content)
+      setCopied(true)
+      toast({
+        title: "Texto copiado",
+        description: "A mensagem foi copiada para a área de transferência.",
+      })
+      setTimeout(() => setCopied(false), 2000)
+    } catch (err) {
+      toast({
+        title: "Erro ao copiar",
+        description: "Não foi possível copiar o texto.",
+        variant: "destructive",
+      })
+    }
+  }
 
   return (
     <div className={cn("mx-auto flex w-full max-w-5xl gap-4 px-4 py-5 md:px-6", isUser && "justify-end")}>
@@ -39,10 +65,6 @@ export function MessageBubble({ role, content }: MessageBubbleProps) {
               resposta sintetizada
             </span>
             <div className="flex-1" />
-            <div className="hidden items-center gap-2 rounded-full border border-primary/35 bg-primary/10 px-3 py-1 text-primary md:flex">
-              <BookOpen className="h-3.5 w-3.5" />
-              <span className="font-rune text-[0.65rem] tracking-[0.12em]">T20 · RAG</span>
-            </div>
           </div>
 
           <div className="prose-grimorio text-base leading-8 text-foreground">
@@ -50,19 +72,37 @@ export function MessageBubble({ role, content }: MessageBubbleProps) {
           </div>
 
           <div className="mt-5 flex flex-wrap items-center gap-1 border-t border-border/70 pt-4 text-sm text-muted-foreground">
-            {[
-              { label: "Regenerar", icon: RotateCcw },
-              { label: "Copiar", icon: Copy },
-              { label: "Salvar no Journal", icon: Save },
-            ].map(({ label, icon: Icon }) => (
+            {isLast && onReload && (
               <button
-                key={label}
+                onClick={onReload}
                 className="flex items-center gap-2 rounded-lg px-3 py-2 transition-colors hover:bg-[hsl(var(--panel-raised))] hover:text-foreground"
               >
-                <Icon className="h-3.5 w-3.5 text-primary" />
-                {label}
+                <RotateCcw className="h-3.5 w-3.5 text-primary" />
+                Regenerar
               </button>
-            ))}
+            )}
+            
+            <button
+              onClick={handleCopy}
+              className="flex items-center gap-2 rounded-lg px-3 py-2 transition-colors hover:bg-[hsl(var(--panel-raised))] hover:text-foreground"
+            >
+              {copied ? (
+                <Check className="h-3.5 w-3.5 text-green-500" />
+              ) : (
+                <Copy className="h-3.5 w-3.5 text-primary" />
+              )}
+              {copied ? "Copiado" : "Copiar"}
+            </button>
+            
+            <button
+              disabled
+              className="flex items-center gap-2 rounded-lg px-3 py-2 opacity-50 cursor-not-allowed"
+              title="Em breve"
+            >
+              <Save className="h-3.5 w-3.5 text-muted-foreground" />
+              Salvar no Journal
+            </button>
+            
             <div className="flex-1" />
             <button className="rounded-lg border border-border/70 p-2 transition-colors hover:border-primary/45 hover:text-foreground">
               <ThumbsUp className="h-4 w-4" />

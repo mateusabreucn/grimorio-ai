@@ -32,7 +32,7 @@ export function ChatInterface({ conversationId, title, initialMessages = [], use
     setActiveConversationId(conversationId);
   }, [conversationId]);
 
-  const { messages, input, setInput, handleInputChange, handleSubmit, isLoading, error } = useChat({
+  const { messages, input, setInput, handleInputChange, handleSubmit, isLoading, error, reload } = useChat({
     api: "/api/chat",
     initialMessages,
     body: {
@@ -77,6 +77,7 @@ export function ChatInterface({ conversationId, title, initialMessages = [], use
           messages={messages} 
           isLoading={isLoading} 
           onCardClick={(text) => setInput(text)}
+          onReload={() => reload()}
         />
       </div>
 
