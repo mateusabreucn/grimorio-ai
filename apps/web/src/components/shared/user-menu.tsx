@@ -77,7 +77,7 @@ export function UserMenu({ user }: UserMenuProps) {
               Perfil
             </Link>
             <button
-              onClick={() => signOut({ callbackUrl: "/login" })}
+              onClick={() => signOut({ callbackUrl: "/chat" })}
               className={cn(
                 "w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm",
                 "text-destructive/80 hover:bg-destructive/10",
