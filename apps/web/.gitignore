@@ -39,3 +39,7 @@ next-env.d.ts
 
 # drizzle
 src/lib/db/migrations/meta/
+
+# golden test — resultados de execução não vão pro git
+scripts/golden/results-*.json
+scripts/golden/results-latest.json
