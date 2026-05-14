@@ -80,8 +80,8 @@
 
 /* Scrollbar Styling */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 8px;
+  height: 8px;
 }
 
 ::-webkit-scrollbar-track {
@@ -89,29 +89,31 @@
 }
 
 ::-webkit-scrollbar-thumb {
-  background: hsl(var(--border) / 0.6);
+  background: hsl(var(--border) / 0.8);
   border-radius: 20px;
-  border: 1px solid transparent;
+  border: 2px solid transparent;
   background-clip: content-box;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: hsl(var(--primary) / 0.4);
-  background-clip: content-box;
-}
-
-.scrollbar-elegant::-webkit-scrollbar {
-  width: 5px;
-}
-
-.scrollbar-elegant::-webkit-scrollbar-thumb {
-  background: hsl(var(--border) / 0.4);
+  background: hsl(var(--primary));
   border: 1px solid transparent;
   background-clip: content-box;
 }
 
+.scrollbar-elegant::-webkit-scrollbar {
+  width: 7px;
+}
+
+.scrollbar-elegant::-webkit-scrollbar-thumb {
+  background: hsl(var(--border));
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
 .scrollbar-elegant::-webkit-scrollbar-thumb:hover {
-  background: hsl(var(--primary) / 0.6);
+  background: hsl(var(--primary));
+  border: 1px solid transparent;
   background-clip: content-box;
 }
 
