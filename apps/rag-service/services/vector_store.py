@@ -20,65 +20,52 @@ def _format_embedding(embedding: list[float]) -> str:
     return "[" + ",".join(str(v) for v in embedding) + "]"
 
 
+def _book_filter_sql(book_ids: list[str] | None) -> tuple[str, list]:
+    """Retorna cláusula SQL e params para filtro de livros. '' = sem filtro."""
+    if not book_ids:
+        return "", []
+    placeholders = ",".join(["%s"] * len(book_ids))
+    return f"AND book_id IN ({placeholders})", list(book_ids)
+
+
 def similarity_search_sync(
     conn: "PgConnection",
     embedding: list[float],
     top_k: int = 5,
-    book_id: str | None = None,
+    book_ids: list[str] | None = None,
     threshold: float | None = None,
 ) -> list[ChunkResult]:
     """
     Busca chunks similares no pgvector usando cosine similarity.
 
-    Usa queries parametrizadas — sem SQL injection.
-
     Args:
         conn: Conexão PostgreSQL do pool.
-        embedding: Vetor da query (768 dimensões).
+        embedding: Vetor da query (1024 dimensões).
         top_k: Número máximo de resultados.
-        book_id: Filtrar por livro específico (None = todos).
+        book_ids: Filtrar por livros (None = todos).
         threshold: Similaridade mínima (default: settings.similarity_threshold).
-
-    Returns:
-        Lista de ChunkResult ordenados por relevância.
     """
     min_similarity = threshold if threshold is not None else settings.similarity_threshold
     embedding_str = _format_embedding(embedding)
 
-    # Query base com cosine similarity — queries parametrizadas evitam SQL injection
-    if book_id:
-        sql = """
-            SELECT
-                id::text,
-                book_id,
-                book_title,
-                content,
-                page_number,
-                chunk_index,
-                1 - (embedding <=> %s::vector) AS similarity
-            FROM document_chunks
-            WHERE book_id = %s
-              AND 1 - (embedding <=> %s::vector) >= %s
-            ORDER BY embedding <=> %s::vector
-            LIMIT %s
-        """
-        params = (embedding_str, book_id, embedding_str, min_similarity, embedding_str, top_k)
-    else:
-        sql = """
-            SELECT
-                id::text,
-                book_id,
-                book_title,
-                content,
-                page_number,
-                chunk_index,
-                1 - (embedding <=> %s::vector) AS similarity
-            FROM document_chunks
-            WHERE 1 - (embedding <=> %s::vector) >= %s
-            ORDER BY embedding <=> %s::vector
-            LIMIT %s
-        """
-        params = (embedding_str, embedding_str, min_similarity, embedding_str, top_k)
+    book_clause, book_params = _book_filter_sql(book_ids)
+
+    sql = f"""
+        SELECT
+            id::text,
+            book_id,
+            book_title,
+            content,
+            page_number,
+            chunk_index,
+            1 - (embedding <=> %s::vector) AS similarity
+        FROM document_chunks
+        WHERE 1 - (embedding <=> %s::vector) >= %s
+          {book_clause}
+        ORDER BY embedding <=> %s::vector
+        LIMIT %s
+    """
+    params: list = [embedding_str, embedding_str, min_similarity] + book_params + [embedding_str, top_k]
 
     cursor = conn.cursor()
     try:
@@ -104,12 +91,12 @@ async def similarity_search(
     conn: "PgConnection",
     embedding: list[float],
     top_k: int = 5,
-    book_id: str | None = None,
+    book_ids: list[str] | None = None,
     threshold: float | None = None,
 ) -> list[ChunkResult]:
     """Versão assíncrona da busca — roda em thread pool."""
     return await asyncio.to_thread(
-        similarity_search_sync, conn, embedding, top_k, book_id, threshold
+        similarity_search_sync, conn, embedding, top_k, book_ids, threshold
     )
 
 
@@ -128,32 +115,16 @@ def lexical_search_sync(
     conn: "PgConnection",
     keywords: list[str],
     top_k: int = 10,
-    book_id: str | None = None,
+    book_ids: list[str] | None = None,
 ) -> list[ChunkResult]:
     """
     Busca chunks via full-text search com dicionário 'portuguese'.
 
-    Cada keyword é convertida em `plainto_tsquery('portuguese', kw)`, o que
-    aplica stemming PT-BR (postura↔posturas, mestre↔mestres) e remove
-    stopwords (de/da/do/das/dos). Múltiplas keywords são combinadas com OR
-    no WHERE; o score final soma um bônus por cada keyword que casou mais
-    um pequeno bônus proporcional ao `ts_rank_cd` do match mais forte.
-
-    A coluna `content_tsv` é GENERATED ALWAYS AS STORED (ver
-    scripts/migrate_fts.py) e indexada com GIN — busca é rápida mesmo
-    com milhares de chunks.
-
     Args:
         conn: Conexão PostgreSQL.
-        keywords: Termos a procurar. Frases multi-palavra são tratadas com
-            AND interno (ex: "Mestre de Posturas" → mestr & postur, e o "de"
-            vira stopword). Variações morfológicas (singular/plural,
-            conjugações) casam automaticamente.
+        keywords: Termos a procurar com stemming PT-BR automático.
         top_k: Limite de resultados.
-        book_id: Filtra por livro (None = todos).
-
-    Returns:
-        Lista de ChunkResult ordenada por score desc.
+        book_ids: Filtra por livros (None = todos).
     """
     # Sanitiza e remove duplicatas mantendo ordem
     seen: set[str] = set()
@@ -194,42 +165,26 @@ def lexical_search_sync(
     rank_sum_sql = " + ".join(rank_exprs)
     where_sql = "(" + " OR ".join(where_clauses) + ")"
 
-    if book_id:
-        sql = f"""
-            SELECT
-                id::text,
-                book_id,
-                book_title,
-                content,
-                page_number,
-                chunk_index,
-                ({match_count_sql}) AS match_count,
-                ({rank_sum_sql}) AS rank_sum
-            FROM document_chunks
-            WHERE {where_sql}
-              AND book_id = %s
-            ORDER BY match_count DESC, rank_sum DESC, chunk_index ASC
-            LIMIT %s
-        """
-        params.append(book_id)
-        params.append(top_k)
-    else:
-        sql = f"""
-            SELECT
-                id::text,
-                book_id,
-                book_title,
-                content,
-                page_number,
-                chunk_index,
-                ({match_count_sql}) AS match_count,
-                ({rank_sum_sql}) AS rank_sum
-            FROM document_chunks
-            WHERE {where_sql}
-            ORDER BY match_count DESC, rank_sum DESC, chunk_index ASC
-            LIMIT %s
-        """
-        params.append(top_k)
+    book_clause, book_params = _book_filter_sql(book_ids)
+
+    sql = f"""
+        SELECT
+            id::text,
+            book_id,
+            book_title,
+            content,
+            page_number,
+            chunk_index,
+            ({match_count_sql}) AS match_count,
+            ({rank_sum_sql}) AS rank_sum
+        FROM document_chunks
+        WHERE {where_sql}
+          {book_clause}
+        ORDER BY match_count DESC, rank_sum DESC, chunk_index ASC
+        LIMIT %s
+    """
+    params.extend(book_params)
+    params.append(top_k)
 
     cursor = conn.cursor()
     try:
@@ -270,10 +225,10 @@ async def lexical_search(
     conn: "PgConnection",
     keywords: list[str],
     top_k: int = 10,
-    book_id: str | None = None,
+    book_ids: list[str] | None = None,
 ) -> list[ChunkResult]:
     """Versão assíncrona do lexical_search_sync."""
-    return await asyncio.to_thread(lexical_search_sync, conn, keywords, top_k, book_id)
+    return await asyncio.to_thread(lexical_search_sync, conn, keywords, top_k, book_ids)
 
 
 def save_chunk_sync(

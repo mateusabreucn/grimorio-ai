@@ -72,13 +72,20 @@ async def search_multi(
         if existing is None or chunk.similarity_score > existing.similarity_score:
             aggregated[key] = chunk
 
+    # Resolve filtro de livros: book_ids tem precedência sobre book_id legado
+    book_ids: list[str] | None = None
+    if request.book_ids:
+        book_ids = request.book_ids
+    elif request.book_id:
+        book_ids = [request.book_id]
+
     # Busca vetorial — uma por query
     for embedding in embeddings:
         chunks = await vector_store.similarity_search(
             conn=conn,
             embedding=embedding,
             top_k=request.top_k_per_query,
-            book_id=request.book_id,
+            book_ids=book_ids,
             threshold=request.threshold,
         )
         for chunk in chunks:
@@ -90,7 +97,7 @@ async def search_multi(
             conn=conn,
             keywords=request.keywords,
             top_k=request.top_k_lexical,
-            book_id=request.book_id,
+            book_ids=book_ids,
         )
         for chunk in lexical_chunks:
             merge(chunk)

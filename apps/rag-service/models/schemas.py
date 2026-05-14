@@ -34,7 +34,8 @@ class MultiSearchRequest(BaseModel):
 
     queries: list[str] = Field(..., min_length=1, max_length=15)
     keywords: list[str] = Field(default_factory=list, max_length=8)
-    book_id: str | None = None
+    book_id: str | None = None          # legado — use book_ids
+    book_ids: list[str] | None = None   # filtro multi-livro; None = todos
     top_k_per_query: int = Field(default=8, ge=1, le=25)
     top_k_lexical: int = Field(default=12, ge=1, le=40)
     max_total_results: int = Field(default=30, ge=1, le=80)
