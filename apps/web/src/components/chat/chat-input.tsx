@@ -3,9 +3,17 @@
 import { type FormEvent, useRef, useEffect, useState } from "react"
 import { Textarea } from "@/components/ui/textarea"
 import { Button } from "@/components/ui/button"
-import { Switch } from "@/components/ui/switch"
-import { Coins, HelpCircle, GraduationCap, Loader2, SendHorizontal, Plus } from "lucide-react"
+import { BookOpen, Coins, HelpCircle, GraduationCap, Loader2, SendHorizontal, Plus, Check, ChevronDown } from "lucide-react"
 import { cn } from "@/lib/utils"
+
+const BOOKS = [
+  { id: "core", label: "Livro Básico" },
+  { id: "herois", label: "Heróis de Arton" },
+  { id: "ameacas", label: "Ameaças de Arton" },
+  { id: "deuses", label: "Deuses de Arton" },
+] as const
+
+type BookId = (typeof BOOKS)[number]["id"]
 
 interface ChatInputProps {
   input: string
@@ -13,8 +21,8 @@ interface ChatInputProps {
   onInputChange: (value: string) => void
   onSubmit: (e: FormEvent<HTMLFormElement>) => void
   placeholder?: string
-  supplementsEnabled?: boolean
-  onSupplementsToggle?: (enabled: boolean) => void
+  selectedBooks?: BookId[]
+  onBooksChange?: (books: BookId[]) => void
 }
 
 export function ChatInput({
@@ -23,11 +31,13 @@ export function ChatInput({
   onInputChange,
   onSubmit,
   placeholder = "Pergunte ao Grimório...",
-  supplementsEnabled = true,
-  onSupplementsToggle,
+  selectedBooks = ["core"],
+  onBooksChange,
 }: ChatInputProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const dropdownRef = useRef<HTMLDivElement>(null)
   const [showSuggestions, setShowSuggestions] = useState(false)
+  const [showBookPicker, setShowBookPicker] = useState(false)
 
   const handleActionClick = (prefix: string) => {
     onInputChange(prefix)
@@ -35,19 +45,34 @@ export function ChatInput({
     textareaRef.current?.focus()
   }
 
+  const toggleBook = (id: BookId) => {
+    if (!onBooksChange) return
+    if (selectedBooks.includes(id)) {
+      if (selectedBooks.length === 1) return // mínimo 1 livro
+      onBooksChange(selectedBooks.filter((b) => b !== id))
+    } else {
+      onBooksChange([...selectedBooks, id])
+    }
+  }
+
+  // Fecha o picker ao clicar fora
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setShowBookPicker(false)
+      }
+    }
+    if (showBookPicker) document.addEventListener("mousedown", handleClickOutside)
+    return () => document.removeEventListener("mousedown", handleClickOutside)
+  }, [showBookPicker])
+
   useEffect(() => {
     const el = textareaRef.current
     if (!el) return
     el.style.height = "auto"
     const scrollHeight = el.scrollHeight
     el.style.height = `${Math.min(scrollHeight, 200)}px`
-    
-    // Mostra scroll apenas se ultrapassar o limite de 200px
-    if (scrollHeight > 200) {
-      el.style.overflowY = "auto"
-    } else {
-      el.style.overflowY = "hidden"
-    }
+    el.style.overflowY = scrollHeight > 200 ? "auto" : "hidden"
   }, [input])
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
@@ -58,6 +83,13 @@ export function ChatInput({
       }
     }
   }
+
+  const bookLabel =
+    selectedBooks.length === BOOKS.length
+      ? "Todos os livros"
+      : selectedBooks.length === 1
+        ? (BOOKS.find((b) => b.id === selectedBooks[0])?.label ?? "1 livro")
+        : `${selectedBooks.length} livros`
 
   return (
     <div className="relative border-t border-border/70 bg-background/80 px-2 py-3 backdrop-blur md:px-8 md:py-4">
@@ -75,27 +107,56 @@ export function ChatInput({
               key={label}
               type="button"
               onClick={() => handleActionClick(prefix)}
-              className="flex items-center gap-2 rounded-full border border-border/70 bg-[hsl(var(--panel-raised))] px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:border-primary/45 hover:text-foreground"
+              className="flex items-center gap-2 rounded-full border border-border/70 bg-[hsl(var(--panel-raised))] px-3 py-1.5 text-xs md:text-sm text-muted-foreground transition-colors hover:border-primary/45 hover:text-foreground"
             >
-              <Icon className="h-3 w-3 text-primary" />
+              <Icon className="h-3 w-3 text-primary md:h-3.5 md:w-3.5" />
               {label}
             </button>
           ))}
 
-          {onSupplementsToggle && (
-            <div className="ml-auto flex items-center gap-2 rounded-full border border-border/70 bg-[hsl(var(--panel-raised))] px-2.5 py-1">
-              <label
-                htmlFor="supplements-toggle"
-                className="font-rune cursor-pointer select-none text-[0.6rem] uppercase tracking-[0.15em] text-muted-foreground"
+          {onBooksChange && (
+            <div ref={dropdownRef} className="relative ml-auto">
+              <button
+                type="button"
+                onClick={() => setShowBookPicker((v) => !v)}
+                className="flex items-center gap-2 rounded-full border border-border/70 bg-[hsl(var(--panel-raised))] px-3 py-1.5 text-xs md:text-sm text-muted-foreground transition-colors hover:border-primary/45 hover:text-foreground"
               >
-                {supplementsEnabled ? "Todos os livros" : "Livro Base"}
-              </label>
-              <Switch
-                id="supplements-toggle"
-                checked={supplementsEnabled}
-                onCheckedChange={onSupplementsToggle}
-                className="scale-[0.65]"
-              />
+                <BookOpen className="h-3 w-3 text-primary md:h-3.5 md:w-3.5" />
+                <span className="font-rune uppercase tracking-[0.1em]">{bookLabel}</span>
+                <ChevronDown className={cn("h-3 w-3 transition-transform", showBookPicker && "rotate-180")} />
+              </button>
+
+              {showBookPicker && (
+                <div className="absolute right-0 bottom-full mb-2 z-50 min-w-[180px] rounded-xl border border-border/70 bg-[hsl(var(--panel-raised))] shadow-lg py-1">
+                  <div className="font-rune px-3 py-1.5 text-[0.58rem] uppercase tracking-[0.2em] text-[hsl(var(--ink-faint))] border-b border-border/50">
+                    Buscar nos livros
+                  </div>
+                  {BOOKS.map((book) => {
+                    const active = selectedBooks.includes(book.id)
+                    return (
+                      <button
+                        key={book.id}
+                        type="button"
+                        onClick={() => toggleBook(book.id)}
+                        className={cn(
+                          "flex w-full items-center gap-2.5 px-3 py-2 text-xs transition-colors hover:bg-[hsl(var(--panel))]",
+                          active ? "text-foreground" : "text-muted-foreground",
+                        )}
+                      >
+                        <div className={cn(
+                          "flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded border transition-colors",
+                          active
+                            ? "border-primary bg-primary text-primary-foreground"
+                            : "border-border/70",
+                        )}>
+                          {active && <Check className="h-2 w-2" />}
+                        </div>
+                        {book.label}
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -124,7 +185,7 @@ export function ChatInput({
             rows={1}
             className={cn(
               "max-h-[200px] min-h-[38px] flex-1 resize-none border-0 bg-transparent overflow-hidden",
-              "px-1 py-2 text-sm leading-relaxed shadow-none",
+              "px-1 py-2 text-sm md:text-base leading-relaxed shadow-none",
               "placeholder:text-muted-foreground/80 focus-visible:ring-0 focus-visible:ring-offset-0",
             )}
           />
@@ -143,8 +204,8 @@ export function ChatInput({
           </Button>
         </form>
 
-        <div className="mt-2 flex items-center justify-center text-[0.6rem] text-[hsl(var(--ink-faint))] md:text-[0.7rem]">
-          <span className="font-body italic tracking-wider">“verifique no livro antes de aplicar na ficha”</span>
+        <div className="mt-2 flex items-center justify-center text-[0.65rem] text-[hsl(var(--ink-faint))] md:text-[0.78rem]">
+          <span className="font-body italic tracking-wider">"verifique no livro antes de aplicar na ficha"</span>
         </div>
       </div>
     </div>

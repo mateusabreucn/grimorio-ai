@@ -33,10 +33,16 @@ export const chatMessageSchema = z.discriminatedUnion("role", [
   }),
 ])
 
+const ALL_BOOK_IDS = ["core", "herois", "ameacas", "deuses"] as const
+
 export const chatRequestSchema = z.object({
   messages: z.array(chatMessageSchema).min(1).max(100),
   conversationId: z.string().uuid().optional(),
-  supplementsEnabled: z.boolean().optional().default(true),
+  selectedBooks: z
+    .array(z.enum(ALL_BOOK_IDS))
+    .min(1)
+    .max(4)
+    .default(["core"]),
 })
 
 export const createConversationSchema = z.object({
