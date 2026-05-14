@@ -33,7 +33,7 @@ export function SidebarContent({ conversations }: SidebarContentProps) {
 
       <SidebarTabs />
 
-      <nav className="relative flex-1 overflow-y-auto px-4 py-5">
+      <nav className="relative flex-1 overflow-y-auto scrollbar-elegant px-4 py-5">
         <ChatNav conversations={conversations} />
       </nav>
 

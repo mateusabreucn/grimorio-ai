@@ -87,7 +87,7 @@ export function ChatInterface({ conversationId, title: initialTitle, initialMess
         )}
       </header>
 
-      <div className="relative flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-border/70 scrollbar-track-transparent hover:scrollbar-thumb-muted-foreground/30">
+      <div className="relative flex-1 overflow-y-auto scrollbar-elegant scrollbar-track-transparent">
         <MessageList 
           messages={messages} 
           isLoading={isLoading} 
