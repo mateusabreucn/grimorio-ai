@@ -3,11 +3,11 @@
 import { auth } from "@/lib/auth"
 import { db } from "@/lib/db"
 import { conversations, messages } from "@/lib/db/schema"
-import { eq, desc, and } from "drizzle-orm"
+import { eq, desc, and, exists } from "drizzle-orm"
 import { revalidatePath } from "next/cache"
 import { redirect } from "next/navigation"
 
-/** Lista todas as conversas do usuário logado, mais recentes primeiro. */
+/** Lista conversas do usuário logado que possuem ao menos uma mensagem. */
 export async function getConversations() {
   const session = await auth()
   if (!session?.user?.id) return []
@@ -19,7 +19,18 @@ export async function getConversations() {
       updatedAt: conversations.updatedAt,
     })
     .from(conversations)
-    .where(eq(conversations.userId, session.user.id))
+    .where(
+      and(
+        eq(conversations.userId, session.user.id),
+        exists(
+          db
+            .select({ one: messages.id })
+            .from(messages)
+            .where(eq(messages.conversationId, conversations.id))
+            .limit(1),
+        ),
+      ),
+    )
     .orderBy(desc(conversations.updatedAt))
     .limit(50)
 }
@@ -83,7 +94,7 @@ export async function renameConversation(conversationId: string, title: string) 
   revalidatePath(`/chat/${conversationId}`)
 }
 
-/** Deleta uma conversa e todas as suas mensagens (cascade no banco). */
+/** Deleta uma conversa e redireciona para /chat (usar quando na conversa deletada). */
 export async function deleteConversation(conversationId: string) {
   const session = await auth()
   if (!session?.user?.id) return
@@ -99,4 +110,21 @@ export async function deleteConversation(conversationId: string) {
 
   revalidatePath("/chat")
   redirect("/chat")
+}
+
+/** Remove uma conversa sem redirecionar (usar da sidebar quando em outra página). */
+export async function removeConversation(conversationId: string) {
+  const session = await auth()
+  if (!session?.user?.id) return
+
+  await db
+    .delete(conversations)
+    .where(
+      and(
+        eq(conversations.id, conversationId),
+        eq(conversations.userId, session.user.id),
+      ),
+    )
+
+  revalidatePath("/chat")
 }
