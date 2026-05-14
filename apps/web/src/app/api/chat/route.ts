@@ -9,9 +9,10 @@ import { and, eq } from "drizzle-orm";
 import { searchMulti, type MultiSearchResult } from "@/lib/rag/client";
 import {
   PLANNER_SYSTEM_PROMPT,
-  SYNTHESIZER_SYSTEM_PROMPT,
   SYNTHESIZER_FALLBACK_PROMPT,
+  synthesizerPromptForIntent,
   buildRagContext,
+  type ChatIntent,
 } from "@/lib/ai/prompts";
 import { chatRequestSchema } from "@/lib/validations/chat";
 import { logChatEvent } from "@/lib/observability/logger";
@@ -24,13 +25,57 @@ import { Redis } from "@upstash/redis";
 
 const googleAI = createGoogleGenerativeAI({ apiKey: env.GOOGLE_AI_API_KEY });
 
+// Modelo do planner — sempre Flash (decisão estrutural, não criativa)
 const PLANNER_MODEL = "gemini-2.5-flash";
-const SYNTHESIZER_MODEL = "gemini-2.5-flash";
+
+/**
+ * Config por intent — define profundidade de busca e modelo do synthesizer.
+ *
+ * - **lookup**: pergunta direta sobre 1 elemento. Pipeline enxuto e Flash basta.
+ * - **composition**: cálculo multi-fonte. Mais chunks + Pro (raciocínio aritmético).
+ * - **recommendation**: enumerar e curar. Muito mais chunks + Pro (síntese ampla).
+ */
+type IntentConfig = {
+  topKPerQuery: number;
+  topKLexical: number;
+  maxTotalResults: number;
+  synthesizerModel: string;
+  synthesizerMode: "lookup" | "composition" | "recommendation";
+};
+
+const INTENT_CONFIG: Record<ChatIntent, IntentConfig> = {
+  lookup: {
+    topKPerQuery: 8,
+    topKLexical: 14,
+    maxTotalResults: 24,
+    synthesizerModel: "gemini-2.5-flash",
+    synthesizerMode: "lookup",
+  },
+  composition: {
+    // composition exige TODOS os componentes presentes para fechar o cálculo;
+    // uma peça faltante = resposta honesta mas incompleta. Aumentamos a
+    // cobertura em relação ao lookup, mas sem inundar (chunks demais em
+    // tabelas multi-coluna confundem o synthesizer entre linhas/colunas).
+    topKPerQuery: 12,
+    topKLexical: 22,
+    maxTotalResults: 44,
+    synthesizerModel: "gemini-2.5-pro",
+    synthesizerMode: "composition",
+  },
+  recommendation: {
+    topKPerQuery: 12,
+    topKLexical: 22,
+    maxTotalResults: 64,
+    synthesizerModel: "gemini-2.5-pro",
+    synthesizerMode: "recommendation",
+  },
+};
 
 const plannerSchema = z.object({
   needsSearch: z.boolean(),
-  queries: z.array(z.string().min(2).max(120)).max(8),
-  keywords: z.array(z.string().min(2).max(60)).max(4).default([]),
+  intent: z.enum(["lookup", "composition", "recommendation"]).default("lookup"),
+  queries: z.array(z.string().min(2).max(120)).max(12),
+  keywords: z.array(z.string().min(2).max(60)).max(6).default([]),
   reasoning: z.string().max(500).optional(),
 });
 
@@ -154,11 +199,12 @@ export async function POST(req: Request) {
     }
   }
 
-  // ─── Step 1: PLANNER — decide se busca, gera queries + keywords ──────────
+  // ─── Step 1: PLANNER — classifica intent + gera queries + keywords ───────
   const plannerStart = Date.now();
   let queries: string[] = [];
   let keywords: string[] = [];
   let needsSearch = false;
+  let intent: ChatIntent = "lookup";
   try {
     const { object: plan } = await generateObject({
       model: googleAI(PLANNER_MODEL),
@@ -168,14 +214,15 @@ export async function POST(req: Request) {
       temperature: 0,
     });
     needsSearch = plan.needsSearch;
+    intent = plan.intent;
     queries = plan.queries
       .map((q) => q.trim())
       .filter((q) => q.length > 0)
-      .slice(0, 8);
+      .slice(0, 12);
     keywords = (plan.keywords ?? [])
       .map((k) => k.trim())
       .filter((k) => k.length >= 2)
-      .slice(0, 4);
+      .slice(0, 6);
   } catch (err) {
     logChatEvent({
       type: "pipeline.error",
@@ -186,7 +233,9 @@ export async function POST(req: Request) {
       stage: "planner",
       message: err instanceof Error ? err.message : String(err),
     });
+    // Fallback degradado: assume lookup com a pergunta literal
     needsSearch = true;
+    intent = "lookup";
     queries = [lastUserMessage.content.slice(0, 120)];
     keywords = [];
   }
@@ -198,10 +247,13 @@ export async function POST(req: Request) {
     conversation_id: resolvedConversationId ?? null,
     user_id: userId,
     needs_search: needsSearch,
+    intent,
     queries,
     keywords,
     elapsed_ms: plannerElapsed,
   });
+
+  const config = INTENT_CONFIG[intent];
 
   // ─── Step 2: Busca híbrida com retorno estruturado ───────────────────────
   let ragResult: MultiSearchResult = {
@@ -212,9 +264,9 @@ export async function POST(req: Request) {
   if (needsSearch && queries.length > 0) {
     ragResult = await searchMulti(queries, {
       keywords,
-      topKPerQuery: 8,
-      topKLexical: 12,
-      maxTotalResults: 24,
+      topKPerQuery: config.topKPerQuery,
+      topKLexical: config.topKLexical,
+      maxTotalResults: config.maxTotalResults,
       bookId: bookIdFilter,
     });
   }
@@ -237,10 +289,14 @@ export async function POST(req: Request) {
 
   const ragFailed = needsSearch && ragResult.error !== undefined;
 
-  // ─── Step 3: SYNTHESIZER — streaming, com fallback se RAG falhou ─────────
+  // ─── Step 3: SYNTHESIZER — prompt e modelo dependem do intent ─────────────
   const synthesizerSystem = ragFailed
     ? SYNTHESIZER_FALLBACK_PROMPT
-    : SYNTHESIZER_SYSTEM_PROMPT;
+    : synthesizerPromptForIntent(intent);
+  const synthesizerModel = ragFailed ? "gemini-2.5-flash" : config.synthesizerModel;
+  const synthesizerMode: PipelineSnapshot["synthesizer"]["mode"] = ragFailed
+    ? "fallback"
+    : config.synthesizerMode;
 
   const synthesizerMessages: CoreMessage[] = history.map((m, i) => {
     const isLast = i === history.length - 1;
@@ -256,7 +312,7 @@ export async function POST(req: Request) {
   const synthesizerStart = Date.now();
 
   const result = await streamText({
-    model: googleAI(SYNTHESIZER_MODEL),
+    model: googleAI(synthesizerModel),
     system: synthesizerSystem,
     messages: synthesizerMessages,
     temperature: 0,
@@ -271,16 +327,18 @@ export async function POST(req: Request) {
         conversation_id: resolvedConversationId ?? null,
         user_id: userId,
         assistant_message_id: assistantMessageId,
+        intent,
+        model: synthesizerModel,
         answer_preview: answerPreview,
         used_fallback: ragFailed,
         elapsed_ms: synthesizerElapsed,
       });
 
       if (userId && resolvedConversationId) {
-        // Snapshot do pipeline para uso futuro pelo endpoint de feedback.
         const snapshot: PipelineSnapshot = {
           question: lastUserMessage.content,
           needs_search: needsSearch,
+          intent,
           queries,
           keywords,
           rag: {
@@ -298,10 +356,11 @@ export async function POST(req: Request) {
           },
           synthesizer: {
             used_fallback: ragFailed,
+            mode: synthesizerMode,
             answer_preview: answerPreview,
             elapsed_ms: synthesizerElapsed,
           },
-          model: SYNTHESIZER_MODEL,
+          model: synthesizerModel,
           created_at: nowIso(),
         };
         setSnapshot(assistantMessageId, snapshot);

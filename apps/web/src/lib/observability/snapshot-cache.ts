@@ -12,6 +12,7 @@ import type { RagErrorType } from "@/lib/rag/client"
 export interface PipelineSnapshot {
   question: string
   needs_search: boolean
+  intent: "lookup" | "composition" | "recommendation"
   queries: string[]
   keywords: string[]
   rag: {
@@ -29,6 +30,7 @@ export interface PipelineSnapshot {
   }
   synthesizer: {
     used_fallback: boolean
+    mode: "lookup" | "composition" | "recommendation" | "fallback"
     answer_preview: string
     elapsed_ms: number
   }

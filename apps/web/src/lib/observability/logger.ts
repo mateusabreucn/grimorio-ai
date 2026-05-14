@@ -16,6 +16,7 @@ export interface ChatEventBase {
 export interface PlannerDoneEvent extends ChatEventBase {
   type: "planner.done"
   needs_search: boolean
+  intent: "lookup" | "composition" | "recommendation"
   queries: string[]
   keywords: string[]
   elapsed_ms: number
@@ -39,6 +40,8 @@ export interface RagDoneEvent extends ChatEventBase {
 export interface SynthesizerDoneEvent extends ChatEventBase {
   type: "synthesizer.done"
   assistant_message_id: string
+  intent: "lookup" | "composition" | "recommendation"
+  model: string
   answer_preview: string
   used_fallback: boolean
   elapsed_ms: number
@@ -46,7 +49,7 @@ export interface SynthesizerDoneEvent extends ChatEventBase {
 
 export interface PipelineErrorEvent extends ChatEventBase {
   type: "pipeline.error"
-  stage: "planner" | "rag" | "synthesizer" | "persist"
+  stage: "planner" | "rag" | "synthesizer" | "persist" | "feedback_persist"
   message: string
 }
 
