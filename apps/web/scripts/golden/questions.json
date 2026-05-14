@@ -121,5 +121,26 @@
     "question": "Quem é Khalmyr e o que ele representa?",
     "expected": "Khalmyr: deus da justiça, da lei, da honra. Detalhes do panteão (Deuses de Arton). Não confundir com outros deuses.",
     "notes": "Divindade específica"
+  },
+  {
+    "id": "lookup-mestre-posturas-de",
+    "category": "specific-power",
+    "question": "O que é o poder Mestre de Posturas?",
+    "expected": "Deve achar o poder Mestre das Posturas (com 'das', como aparece no livro) mesmo o usuário escrevendo 'de'. Resposta deve descrever o poder corretamente com fonte. intent=lookup esperado.",
+    "notes": "Caso crítico FTS: variação morfológica (de/das). Antes o ILIKE não casava — agora o stopwords do PT-BR no FTS resolve."
+  },
+  {
+    "id": "composition-manopla-aco-rubi",
+    "category": "composition",
+    "question": "Qual o valor de venda de uma manopla de aço rubi?",
+    "expected": "Resposta deve combinar (1) preço base da manopla, (2) custo da modificação aço rubi, (3) regra de venda (metade do valor). Deve mostrar o cálculo passo a passo com fonte de cada componente. intent=composition esperado. Se algum componente faltar no material, deve dizer claramente sem inventar.",
+    "notes": "Caso crítico de composição multi-fonte. Antes respondia 'não consta'; agora deve compor."
+  },
+  {
+    "id": "recommendation-ladino-veneno",
+    "category": "recommendation",
+    "question": "Sugira uma build de Ladino com foco em veneno",
+    "expected": "Deve enumerar ANTES de curar: listar todas as perícias permitidas para Ladino (com quantidade correta — o Ladino escolhe perícias treinadas), listar todos os poderes de classe relevantes para veneno, citar regras de Envenenar, sugerir atributos e origem com fonte. intent=recommendation esperado. NÃO deve cair em 7 perícias quando a classe permite 10, nem listar só 8 poderes quando há mais.",
+    "notes": "Caso crítico: pipeline antigo recomendava incompleto (7 perícias, 8 poderes). Pipeline recommendation deve trazer mais chunks e enumerar exaustivamente."
   }
 ]

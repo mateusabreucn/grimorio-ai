@@ -1,6 +1,10 @@
 /**
- * Golden eval — roda o pipeline (planner → search híbrida → synthesizer) contra
- * uma lista curada de perguntas e salva os resultados em JSON para revisão.
+ * Golden eval — roda o pipeline real (planner → search híbrida → synthesizer)
+ * contra uma lista curada de perguntas e salva os resultados em JSON.
+ *
+ * O pipeline é intent-aware: o planner classifica lookup | composition |
+ * recommendation, e cada intent dispara um config diferente (queries, topK,
+ * modelo e prompt do synthesizer). Mantemos esse comportamento aqui.
  *
  * Uso:
  *   cd apps/web
@@ -22,15 +26,13 @@ const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
 const WEB_ROOT = resolve(__dirname, "..", "..")
 
-// Carrega .env.local da raiz do app/web
 dotenvConfig({ path: join(WEB_ROOT, ".env.local") })
 
-// Prompts são importados como source TS (tsx resolve diretamente)
-// buildRagContext aceita RagChunk (interface tipada como any aqui via cast)
 import {
   PLANNER_SYSTEM_PROMPT,
-  SYNTHESIZER_SYSTEM_PROMPT,
+  synthesizerPromptForIntent,
   buildRagContext,
+  type ChatIntent,
 } from "../../src/lib/ai/prompts"
 
 const GOOGLE_AI_API_KEY = process.env.GOOGLE_AI_API_KEY
@@ -46,10 +48,24 @@ const googleAI = createGoogleGenerativeAI({ apiKey: GOOGLE_AI_API_KEY })
 
 const plannerSchema = z.object({
   needsSearch: z.boolean(),
-  queries: z.array(z.string().min(2).max(120)).max(8),
-  keywords: z.array(z.string().min(2).max(60)).max(4).default([]),
+  intent: z.enum(["lookup", "composition", "recommendation"]).default("lookup"),
+  queries: z.array(z.string().min(2).max(120)).max(12),
+  keywords: z.array(z.string().min(2).max(60)).max(6).default([]),
   reasoning: z.string().max(500).optional(),
 })
+
+type IntentConfig = {
+  topKPerQuery: number
+  topKLexical: number
+  maxTotalResults: number
+  model: string
+}
+
+const INTENT_CONFIG: Record<ChatIntent, IntentConfig> = {
+  lookup: { topKPerQuery: 8, topKLexical: 14, maxTotalResults: 24, model: "gemini-2.5-flash" },
+  composition: { topKPerQuery: 14, topKLexical: 28, maxTotalResults: 56, model: "gemini-2.5-pro" },
+  recommendation: { topKPerQuery: 12, topKLexical: 22, maxTotalResults: 64, model: "gemini-2.5-pro" },
+}
 
 interface RagChunk {
   content: string
@@ -60,7 +76,11 @@ interface RagChunk {
   similarity_score: number
 }
 
-async function searchMultiHttp(queries: string[], keywords: string[]): Promise<RagChunk[]> {
+async function searchMultiHttp(
+  queries: string[],
+  keywords: string[],
+  cfg: IntentConfig,
+): Promise<RagChunk[]> {
   const response = await fetch(`${RAG_SERVICE_URL}/search/multi`, {
     method: "POST",
     headers: {
@@ -70,17 +90,17 @@ async function searchMultiHttp(queries: string[], keywords: string[]): Promise<R
     body: JSON.stringify({
       queries,
       keywords,
-      top_k_per_query: 8,
-      top_k_lexical: 12,
-      max_total_results: 24,
+      top_k_per_query: cfg.topKPerQuery,
+      top_k_lexical: cfg.topKLexical,
+      max_total_results: cfg.maxTotalResults,
     }),
-    signal: AbortSignal.timeout(30_000),
+    signal: AbortSignal.timeout(45_000),
   })
   if (!response.ok) {
     const text = await response.text()
     throw new Error(`RAG ${response.status}: ${text}`)
   }
-  const data = await response.json() as { chunks: RagChunk[] }
+  const data = (await response.json()) as { chunks: RagChunk[] }
   return data.chunks
 }
 
@@ -96,6 +116,7 @@ interface Result extends GoldenItem {
   answer: string
   planner: {
     needsSearch: boolean
+    intent: ChatIntent
     queries: string[]
     keywords: string[]
   }
@@ -103,6 +124,7 @@ interface Result extends GoldenItem {
     chunkCount: number
     topChunks: { book: string; page: number | null; score: number; preview: string }[]
   }
+  synthesizerModel: string
   elapsedMs: number
   error?: string
 }
@@ -126,24 +148,33 @@ async function runOne(item: GoldenItem): Promise<Result> {
     return {
       ...item,
       answer: "",
-      planner: { needsSearch: false, queries: [], keywords: [] },
+      planner: { needsSearch: false, intent: "lookup", queries: [], keywords: [] },
       retrieval: { chunkCount: 0, topChunks: [] },
+      synthesizerModel: "n/a",
       elapsedMs: Date.now() - t0,
       error: `Planner falhou: ${(err as Error).message}`,
     }
   }
 
-  // 2. Retrieval híbrido
+  const cfg = INTENT_CONFIG[plan.intent]
+
+  // 2. Retrieval híbrido (intent-aware)
   let chunks: RagChunk[] = []
   if (plan.needsSearch && plan.queries.length > 0) {
     try {
-      chunks = await searchMultiHttp(plan.queries, plan.keywords)
+      chunks = await searchMultiHttp(plan.queries, plan.keywords, cfg)
     } catch (err) {
       return {
         ...item,
         answer: "",
-        planner: { needsSearch: plan.needsSearch, queries: plan.queries, keywords: plan.keywords },
+        planner: {
+          needsSearch: plan.needsSearch,
+          intent: plan.intent,
+          queries: plan.queries,
+          keywords: plan.keywords,
+        },
         retrieval: { chunkCount: 0, topChunks: [] },
+        synthesizerModel: cfg.model,
         elapsedMs: Date.now() - t0,
         error: `RAG falhou: ${(err as Error).message}`,
       }
@@ -163,8 +194,8 @@ async function runOne(item: GoldenItem): Promise<Result> {
   let answer = ""
   try {
     const { text } = await generateText({
-      model: googleAI("gemini-2.5-flash"),
-      system: SYNTHESIZER_SYSTEM_PROMPT,
+      model: googleAI(cfg.model),
+      system: synthesizerPromptForIntent(plan.intent),
       messages: synthMessages,
       temperature: 0,
     })
@@ -173,7 +204,12 @@ async function runOne(item: GoldenItem): Promise<Result> {
     return {
       ...item,
       answer: "",
-      planner: { needsSearch: plan.needsSearch, queries: plan.queries, keywords: plan.keywords },
+      planner: {
+        needsSearch: plan.needsSearch,
+        intent: plan.intent,
+        queries: plan.queries,
+        keywords: plan.keywords,
+      },
       retrieval: {
         chunkCount: chunks.length,
         topChunks: chunks.slice(0, 5).map((c) => ({
@@ -183,6 +219,7 @@ async function runOne(item: GoldenItem): Promise<Result> {
           preview: c.content.slice(0, 140).replace(/\n/g, " "),
         })),
       },
+      synthesizerModel: cfg.model,
       elapsedMs: Date.now() - t0,
       error: `Synthesizer falhou: ${(err as Error).message}`,
     }
@@ -193,6 +230,7 @@ async function runOne(item: GoldenItem): Promise<Result> {
     answer,
     planner: {
       needsSearch: plan.needsSearch,
+      intent: plan.intent,
       queries: plan.queries,
       keywords: plan.keywords,
     },
@@ -205,6 +243,7 @@ async function runOne(item: GoldenItem): Promise<Result> {
         preview: c.content.slice(0, 140).replace(/\n/g, " "),
       })),
     },
+    synthesizerModel: cfg.model,
     elapsedMs: Date.now() - t0,
   }
 }
@@ -229,7 +268,9 @@ async function main() {
     process.stdout.write(`${prefix.padEnd(38)} ${item.question.slice(0, 50)}...`)
     const result = await runOne(item)
     results.push(result)
-    const tag = result.error ? `✗ ${result.error.slice(0, 40)}` : `✓ ${result.elapsedMs}ms (${result.retrieval.chunkCount} chunks)`
+    const tag = result.error
+      ? `✗ ${result.error.slice(0, 40)}`
+      : `✓ ${result.elapsedMs}ms (${result.planner.intent}, ${result.retrieval.chunkCount} chunks)`
     console.log(`  ${tag}`)
   }
 
