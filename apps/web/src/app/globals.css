@@ -80,41 +80,39 @@
 
 /* Scrollbar Styling */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 10px;
+  height: 10px;
 }
 
 ::-webkit-scrollbar-track {
-  background: transparent;
+  background: hsl(var(--border) / 0.1);
+  border-radius: 10px;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: hsl(var(--border) / 0.8);
-  border-radius: 20px;
+  background: hsl(var(--border));
+  border-radius: 10px;
   border: 2px solid transparent;
-  background-clip: content-box;
+  background-clip: padding-box;
 }
 
 ::-webkit-scrollbar-thumb:hover {
   background: hsl(var(--primary));
   border: 1px solid transparent;
-  background-clip: content-box;
 }
 
 .scrollbar-elegant::-webkit-scrollbar {
-  width: 7px;
+  width: 8px;
 }
 
 .scrollbar-elegant::-webkit-scrollbar-thumb {
   background: hsl(var(--border));
-  border: 2px solid transparent;
-  background-clip: content-box;
+  border-radius: 10px;
+  border: 1px solid transparent;
 }
 
 .scrollbar-elegant::-webkit-scrollbar-thumb:hover {
   background: hsl(var(--primary));
-  border: 1px solid transparent;
-  background-clip: content-box;
 }
 
 @keyframes typing-bounce {
