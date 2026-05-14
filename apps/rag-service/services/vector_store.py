@@ -113,10 +113,15 @@ async def similarity_search(
     )
 
 
-# Score artificial atribuído a matches lexicais. Fica numa faixa "boa" sem
-# mascarar matches vetoriais reais (que geralmente vão de 0.4 a 0.8). Quando
-# o mesmo chunk aparece em ambos os tipos de busca, o merge pega o max.
+# Score base atribuído a matches lexicais (full-text search). Fica numa faixa
+# "boa" sem mascarar matches vetoriais reais (que vão tipicamente de 0.4 a 0.8).
+# Quando o mesmo chunk aparece em ambos os tipos de busca, o merge pega o max.
 _LEXICAL_BASE_SCORE = 0.75
+_LEXICAL_MAX_SCORE = 0.92
+# Quanto cada keyword adicional que casou agrega (até saturar em _MAX_SCORE).
+_LEXICAL_KW_BONUS = 0.05
+# Multiplicador do ts_rank_cd para mapear ranking nativo (0..~1) num bônus extra.
+_LEXICAL_RANK_BONUS_CAP = 0.10
 
 
 def lexical_search_sync(
@@ -126,20 +131,29 @@ def lexical_search_sync(
     book_id: str | None = None,
 ) -> list[ChunkResult]:
     """
-    Busca chunks que contenham literalmente alguma das keywords (case-insensitive).
+    Busca chunks via full-text search com dicionário 'portuguese'.
 
-    Usa ILIKE com OR. Resultados recebem similarity_score artificial alto
-    (_LEXICAL_BASE_SCORE) para que matches exatos sejam priorizados no ranking
-    final. Chunks que casam com várias keywords ganham bônus marginal.
+    Cada keyword é convertida em `plainto_tsquery('portuguese', kw)`, o que
+    aplica stemming PT-BR (postura↔posturas, mestre↔mestres) e remove
+    stopwords (de/da/do/das/dos). Múltiplas keywords são combinadas com OR
+    no WHERE; o score final soma um bônus por cada keyword que casou mais
+    um pequeno bônus proporcional ao `ts_rank_cd` do match mais forte.
+
+    A coluna `content_tsv` é GENERATED ALWAYS AS STORED (ver
+    scripts/migrate_fts.py) e indexada com GIN — busca é rápida mesmo
+    com milhares de chunks.
 
     Args:
         conn: Conexão PostgreSQL.
-        keywords: Termos a procurar (cada um vira um ILIKE OR).
+        keywords: Termos a procurar. Frases multi-palavra são tratadas com
+            AND interno (ex: "Mestre de Posturas" → mestr & postur, e o "de"
+            vira stopword). Variações morfológicas (singular/plural,
+            conjugações) casam automaticamente.
         top_k: Limite de resultados.
         book_id: Filtra por livro (None = todos).
 
     Returns:
-        Lista de ChunkResult ordenada por número de keywords que casaram (desc).
+        Lista de ChunkResult ordenada por score desc.
     """
     # Sanitiza e remove duplicatas mantendo ordem
     seen: set[str] = set()
@@ -157,19 +171,28 @@ def lexical_search_sync(
     if not clean_kws:
         return []
 
-    # Monta SELECT que conta quantas keywords casaram (pra desempate)
-    match_exprs = []
-    where_exprs = []
+    # Para cada keyword:
+    #   - uma cláusula `content_tsv @@ plainto_tsquery('portuguese', %s)` no WHERE
+    #   - um `(content_tsv @@ tsquery)::int` no SELECT (contador de matches)
+    #   - um `ts_rank_cd(...)` no SELECT (rank nativo, somado pra ranking fino)
+    where_clauses: list[str] = []
+    match_exprs: list[str] = []
+    rank_exprs: list[str] = []
     params: list[object] = []
+
     for kw in clean_kws:
-        like = f"%{kw}%"
-        match_exprs.append("(CASE WHEN content ILIKE %s THEN 1 ELSE 0 END)")
-        params.append(like)
-        where_exprs.append("content ILIKE %s")
-        params.append(like)
+        where_clauses.append("content_tsv @@ plainto_tsquery('portuguese', %s)")
+        params.append(kw)
+
+        match_exprs.append("(content_tsv @@ plainto_tsquery('portuguese', %s))::int")
+        params.append(kw)
+
+        rank_exprs.append("ts_rank_cd(content_tsv, plainto_tsquery('portuguese', %s))")
+        params.append(kw)
 
     match_count_sql = " + ".join(match_exprs)
-    where_sql = "(" + " OR ".join(where_exprs) + ")"
+    rank_sum_sql = " + ".join(rank_exprs)
+    where_sql = "(" + " OR ".join(where_clauses) + ")"
 
     if book_id:
         sql = f"""
@@ -180,11 +203,12 @@ def lexical_search_sync(
                 content,
                 page_number,
                 chunk_index,
-                ({match_count_sql}) AS match_count
+                ({match_count_sql}) AS match_count,
+                ({rank_sum_sql}) AS rank_sum
             FROM document_chunks
             WHERE {where_sql}
               AND book_id = %s
-            ORDER BY match_count DESC, chunk_index ASC
+            ORDER BY match_count DESC, rank_sum DESC, chunk_index ASC
             LIMIT %s
         """
         params.append(book_id)
@@ -198,10 +222,11 @@ def lexical_search_sync(
                 content,
                 page_number,
                 chunk_index,
-                ({match_count_sql}) AS match_count
+                ({match_count_sql}) AS match_count,
+                ({rank_sum_sql}) AS rank_sum
             FROM document_chunks
             WHERE {where_sql}
-            ORDER BY match_count DESC, chunk_index ASC
+            ORDER BY match_count DESC, rank_sum DESC, chunk_index ASC
             LIMIT %s
         """
         params.append(top_k)
@@ -213,13 +238,20 @@ def lexical_search_sync(
     finally:
         cursor.close()
 
-    total_kws = max(1, len(clean_kws))
     results: list[ChunkResult] = []
     for row in rows:
         match_count = int(row[6])
-        # Bônus marginal: cada keyword extra adiciona até +0.05, sem ultrapassar 0.9
-        boost = min(0.15, 0.05 * (match_count - 1))
-        score = min(0.9, _LEXICAL_BASE_SCORE + boost) if match_count > 0 else _LEXICAL_BASE_SCORE
+        rank_sum = float(row[7] or 0.0)
+
+        # Bônus por keywords adicionais casadas (até +0.15 com 4 keywords)
+        kw_bonus = min(0.15, _LEXICAL_KW_BONUS * max(0, match_count - 1))
+        # Bônus proporcional ao rank do FTS — saturado em _LEXICAL_RANK_BONUS_CAP.
+        # ts_rank_cd típico de match razoável fica entre 0.05 e 0.5 — usamos um
+        # escala simples para mapear pra [0, _CAP].
+        rank_bonus = min(_LEXICAL_RANK_BONUS_CAP, rank_sum * 0.2)
+
+        score = min(_LEXICAL_MAX_SCORE, _LEXICAL_BASE_SCORE + kw_bonus + rank_bonus)
+
         results.append(
             ChunkResult(
                 content=row[3],
