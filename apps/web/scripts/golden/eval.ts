@@ -21,6 +21,7 @@ import { readFileSync, writeFileSync } from "fs"
 import { generateObject, generateText, type CoreMessage } from "ai"
 import { createGoogleGenerativeAI } from "@ai-sdk/google"
 import { z } from "zod"
+import postgres from "postgres"
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
@@ -63,7 +64,7 @@ type IntentConfig = {
 
 const INTENT_CONFIG: Record<ChatIntent, IntentConfig> = {
   lookup: { topKPerQuery: 8, topKLexical: 14, maxTotalResults: 24, model: "gemini-2.5-flash" },
-  composition: { topKPerQuery: 14, topKLexical: 28, maxTotalResults: 56, model: "gemini-2.5-pro" },
+  composition: { topKPerQuery: 12, topKLexical: 22, maxTotalResults: 44, model: "gemini-2.5-pro" },
   recommendation: { topKPerQuery: 12, topKLexical: 22, maxTotalResults: 64, model: "gemini-2.5-pro" },
 }
 
@@ -248,24 +249,114 @@ async function runOne(item: GoldenItem): Promise<Result> {
   }
 }
 
-async function main() {
-  const questionsPath = join(__dirname, "questions.json")
-  const items: GoldenItem[] = JSON.parse(readFileSync(questionsPath, "utf-8"))
+// ─── Carregar questões de feedbacks negativos do banco ───────────────────────
 
-  console.log(`\nGolden Eval — ${items.length} perguntas\n`)
+interface FeedbackSnapshot {
+  question: string
+  intent: string
+  queries?: string[]
+  keywords?: string[]
+  rag?: { chunk_count: number }
+}
 
-  const filterId = process.argv[2]
-  const filtered = filterId ? items.filter((i) => i.id.includes(filterId)) : items
-  if (filtered.length === 0) {
-    console.error(`Nenhuma pergunta com id contendo "${filterId}".`)
+interface FeedbackRow {
+  id: string
+  comment: string | null
+  pipeline_snapshot: FeedbackSnapshot | null
+  created_at: Date
+}
+
+async function loadFeedbackItems(limit: number): Promise<GoldenItem[]> {
+  const DATABASE_URL = process.env.DATABASE_URL
+  if (!DATABASE_URL) {
+    console.error("Falta DATABASE_URL no .env.local — necessário para --feedback")
     process.exit(1)
   }
+
+  const sql = postgres(DATABASE_URL, { max: 1 })
+  try {
+    const rows = await sql<FeedbackRow[]>`
+      SELECT id, comment, pipeline_snapshot, created_at
+      FROM message_feedback
+      WHERE vote = 'down'
+        AND pipeline_snapshot IS NOT NULL
+        AND pipeline_snapshot->>'question' IS NOT NULL
+      ORDER BY created_at DESC
+      LIMIT ${limit}
+    `
+
+    if (rows.length === 0) {
+      console.log("Nenhum feedback negativo com snapshot disponível no banco.")
+      process.exit(0)
+    }
+
+    // Deduplicar por pergunta (mesma pergunta pode ter sido votada negativamente várias vezes)
+    const seen = new Set<string>()
+    const items: GoldenItem[] = []
+    for (const row of rows) {
+      const snap = row.pipeline_snapshot!
+      const key = snap.question.trim().toLowerCase()
+      if (seen.has(key)) continue
+      seen.add(key)
+
+      items.push({
+        id: `feedback-${row.id.slice(0, 8)}`,
+        category: `feedback-${snap.intent ?? "unknown"}`,
+        question: snap.question,
+        expected: row.comment
+          ? `[Feedback negativo] "${row.comment}"`
+          : "[Feedback negativo — sem comentário]",
+        notes: `intent original: ${snap.intent ?? "?"}, chunks: ${snap.rag?.chunk_count ?? "?"}`,
+      })
+    }
+
+    return items
+  } finally {
+    await sql.end()
+  }
+}
+
+// ─── Main ─────────────────────────────────────────────────────────────────────
+
+async function main() {
+  const rawArgs = process.argv.slice(2)
+  const feedbackMode = rawArgs.includes("--feedback")
+  const limitArg = rawArgs.find((a) => a.startsWith("--limit="))
+  const feedbackLimit = limitArg ? parseInt(limitArg.split("=")[1], 10) : 50
+
+  // Filtra argumentos que não são flags (ex: substring de ID para modo estático)
+  const positionalArgs = rawArgs.filter((a) => !a.startsWith("--"))
+
+  let items: GoldenItem[]
+
+  if (feedbackMode) {
+    console.log(`\nGolden Eval — modo feedback (últimos ${feedbackLimit} negativos)\n`)
+    items = await loadFeedbackItems(feedbackLimit)
+  } else {
+    const questionsPath = join(__dirname, "questions.json")
+    items = JSON.parse(readFileSync(questionsPath, "utf-8")) as GoldenItem[]
+  }
+
+  const filterId = positionalArgs[0]
+  const filtered = filterId ? items.filter((i) => i.id.includes(filterId)) : items
+
+  if (filtered.length === 0) {
+    if (filterId) {
+      console.error(`Nenhuma pergunta com id contendo "${filterId}".`)
+    } else {
+      console.error("Nenhuma pergunta para avaliar.")
+    }
+    process.exit(1)
+  }
+
+  const source = feedbackMode ? "feedback" : "questions.json"
+  console.log(`\nGolden Eval — ${filtered.length} perguntas  [fonte: ${source}]\n`)
 
   const results: Result[] = []
   for (let i = 0; i < filtered.length; i++) {
     const item = filtered[i]
     const prefix = `[${i + 1}/${filtered.length}] ${item.id}`
-    process.stdout.write(`${prefix.padEnd(38)} ${item.question.slice(0, 50)}...`)
+    process.stdout.write(`${prefix.padEnd(42)} ${item.question.slice(0, 46)}...`)
     const result = await runOne(item)
     results.push(result)
     const tag = result.error
@@ -275,8 +366,9 @@ async function main() {
   }
 
   const ts = new Date().toISOString().replace(/[:.]/g, "-")
-  const outPath = join(__dirname, `results-${ts}.json`)
-  const latestPath = join(__dirname, "results-latest.json")
+  const suffix = feedbackMode ? "-feedback" : ""
+  const outPath = join(__dirname, `results${suffix}-${ts}.json`)
+  const latestPath = join(__dirname, feedbackMode ? "results-feedback-latest.json" : "results-latest.json")
   const payload = JSON.stringify(results, null, 2)
   writeFileSync(outPath, payload, "utf-8")
   writeFileSync(latestPath, payload, "utf-8")

@@ -142,5 +142,19 @@
     "question": "Sugira uma build de Ladino com foco em veneno",
     "expected": "Deve enumerar ANTES de curar: listar todas as perícias permitidas para Ladino (com quantidade correta — o Ladino escolhe perícias treinadas), listar todos os poderes de classe relevantes para veneno, citar regras de Envenenar, sugerir atributos e origem com fonte. intent=recommendation esperado. NÃO deve cair em 7 perícias quando a classe permite 10, nem listar só 8 poderes quando há mais.",
     "notes": "Caso crítico: pipeline antigo recomendava incompleto (7 perícias, 8 poderes). Pipeline recommendation deve trazer mais chunks e enumerar exaustivamente."
+  },
+  {
+    "id": "spell-salto-short",
+    "category": "specific-spell",
+    "question": "O que é Salto Dimensional?",
+    "expected": "Salto Dimensional é uma magia de teleportação de curto alcance. O planner deve extrair 'Salto Dimensional' como keyword mesmo com formulação curta ('o que é X?'). A resposta deve descrever: teleporte para local dentro do alcance, alcance curto, alvo você, duração instantânea. keywords=['Salto Dimensional'] esperado.",
+    "notes": "Teste de keyword extraction em perguntas curtas ('o que é X?'). Antes do fix do planner, variações curtas não geravam keyword e o RAG retornava vazio."
+  },
+  {
+    "id": "lore-tagmar",
+    "category": "edge-case",
+    "question": "Tem Tagmar no jogo?",
+    "expected": "Tagmar é um RPG brasileiro anterior a Tormenta. Se houver menção nos livros, citar com fonte. Se não houver, dizer claramente que não foi encontrado nos materiais disponíveis. NÃO inventar. keywords=['Tagmar'] esperado — o planner deve extrair o nome próprio mesmo com formulação coloquial ('tem X?').",
+    "notes": "Teste de keyword extraction em pergunta coloquial existencial ('tem X?'). Valida que nomes próprios são sempre extraídos como keywords, independente da formulação."
   }
 ]

@@ -11,7 +11,8 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:studio": "drizzle-kit studio",
-    "golden": "tsx scripts/golden/eval.ts"
+    "golden": "tsx scripts/golden/eval.ts",
+    "feedback-report": "tsx scripts/feedback-report.ts"
   },
   "dependencies": {
     "@ai-sdk/google": "^0.0.55",
