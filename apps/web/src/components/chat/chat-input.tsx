@@ -39,7 +39,15 @@ export function ChatInput({
     const el = textareaRef.current
     if (!el) return
     el.style.height = "auto"
-    el.style.height = `${Math.min(el.scrollHeight, 200)}px`
+    const scrollHeight = el.scrollHeight
+    el.style.height = `${Math.min(scrollHeight, 200)}px`
+    
+    // Mostra scroll apenas se ultrapassar o limite de 200px
+    if (scrollHeight > 200) {
+      el.style.overflowY = "auto"
+    } else {
+      el.style.overflowY = "hidden"
+    }
   }, [input])
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
@@ -115,7 +123,7 @@ export function ChatInput({
             placeholder={placeholder}
             rows={1}
             className={cn(
-              "max-h-[200px] min-h-[38px] flex-1 resize-none border-0 bg-transparent",
+              "max-h-[200px] min-h-[38px] flex-1 resize-none border-0 bg-transparent overflow-hidden",
               "px-1 py-2 text-sm leading-relaxed shadow-none",
               "placeholder:text-muted-foreground/80 focus-visible:ring-0 focus-visible:ring-offset-0",
             )}
