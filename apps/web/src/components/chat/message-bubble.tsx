@@ -36,7 +36,7 @@ export function MessageBubble({ role, content, onReload, isLast }: MessageBubble
   }
 
   return (
-    <div className={cn("mx-auto flex w-full max-w-5xl gap-4 px-4 py-5 md:px-6", isUser && "justify-end")}>
+    <div className={cn("mx-auto flex w-full max-w-5xl gap-3 px-2 py-3 md:gap-4 md:px-6 md:py-5", isUser && "justify-end")}>
       <div
         className={cn(
           "flex h-10 w-10 shrink-0 items-center justify-center rounded-xl",

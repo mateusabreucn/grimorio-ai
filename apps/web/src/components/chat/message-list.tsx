@@ -67,7 +67,7 @@ export function MessageList({ messages, isLoading, onCardClick, onReload }: Mess
   }
 
   return (
-    <div className="flex flex-col py-6">
+    <div className="flex flex-col py-3 md:py-6">
       {messages.map((msg, index) => (
         <MessageBubble
           key={msg.id}
@@ -79,7 +79,7 @@ export function MessageList({ messages, isLoading, onCardClick, onReload }: Mess
       ))}
 
       {isLoading && (
-        <div className="mx-auto flex w-full max-w-5xl gap-4 px-4 py-5 md:px-6">
+        <div className="mx-auto flex w-full max-w-5xl gap-3 px-2 py-3 md:gap-4 md:px-6 md:py-5">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-primary/35 bg-[hsl(var(--panel-raised))]">
             <Compass className="h-5 w-5 text-primary" />
           </div>
