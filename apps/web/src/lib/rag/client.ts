@@ -30,7 +30,7 @@ export interface MultiSearchOptions {
   topKPerQuery?: number
   topKLexical?: number
   maxTotalResults?: number
-  bookId?: string
+  bookIds?: string[]
   threshold?: number
   timeoutMs?: number
 }
@@ -67,13 +67,13 @@ function classifyError(err: unknown): RagErrorType {
 export async function searchChunks(
   query: string,
   topK: number = 5,
-  bookId?: string,
+  bookIds?: string[],
 ): Promise<RagChunk[]> {
   const result = await searchMulti([query], {
     topKPerQuery: topK,
     topKLexical: 0,
     maxTotalResults: topK,
-    bookId,
+    bookIds,
   })
   return result.chunks
 }
@@ -101,7 +101,7 @@ export async function searchMulti(
     topKPerQuery = 8,
     topKLexical = 12,
     maxTotalResults = 30,
-    bookId,
+    bookIds,
     threshold,
     timeoutMs = DEFAULT_TIMEOUT_MS,
   } = options
@@ -112,7 +112,7 @@ export async function searchMulti(
     top_k_per_query: topKPerQuery,
     top_k_lexical: topKLexical,
     max_total_results: maxTotalResults,
-    book_id: bookId ?? null,
+    book_ids: bookIds ?? null,
     threshold: threshold ?? null,
   })
 

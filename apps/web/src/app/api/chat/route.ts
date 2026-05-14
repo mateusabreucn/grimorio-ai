@@ -151,8 +151,12 @@ export async function POST(req: Request) {
     );
   }
 
-  const { messages: clientMessages, conversationId, supplementsEnabled } = parsed.data;
-  const bookIdFilter = supplementsEnabled ? undefined : "core";
+  const { messages: clientMessages, conversationId, selectedBooks } = parsed.data;
+
+  // Nenhum filtro quando todos os 4 livros estão selecionados
+  const ALL_BOOK_IDS = ["core", "herois", "ameacas", "deuses"];
+  const bookIdsFilter =
+    selectedBooks.length === ALL_BOOK_IDS.length ? undefined : selectedBooks;
 
   const session = await auth();
   const userId = session?.user?.id ?? null;
@@ -173,30 +177,32 @@ export async function POST(req: Request) {
     return new Response("Nenhuma mensagem do usuário no histórico.", { status: 400 });
   }
 
-  if (userId) {
-    if (resolvedConversationId) {
-      const [conversation] = await db
-        .select({ id: conversations.id })
-        .from(conversations)
-        .where(
-          and(
-            eq(conversations.id, resolvedConversationId),
-            eq(conversations.userId, userId),
-          ),
-        )
-        .limit(1);
+  // Reserva um ID para a nova conversa sem inserir no banco ainda.
+  // A inserção acontece em onFinish, apenas se a IA gerar uma resposta.
+  // Isso previne conversas vazias no histórico quando a IA falha.
+  const pendingConversationId = userId && !conversationId
+    ? crypto.randomUUID()
+    : null;
 
-      if (!conversation) {
-        return new Response("Conversa não encontrada", { status: 404 });
-      }
-    } else {
-      const title = lastUserMessage.content.slice(0, 60);
-      const [newConv] = await db
-        .insert(conversations)
-        .values({ userId, title })
-        .returning({ id: conversations.id });
-      resolvedConversationId = newConv.id;
+  if (userId && resolvedConversationId) {
+    const [conversation] = await db
+      .select({ id: conversations.id })
+      .from(conversations)
+      .where(
+        and(
+          eq(conversations.id, resolvedConversationId),
+          eq(conversations.userId, userId),
+        ),
+      )
+      .limit(1);
+
+    if (!conversation) {
+      return new Response("Conversa não encontrada", { status: 404 });
     }
+  }
+
+  if (pendingConversationId) {
+    resolvedConversationId = pendingConversationId;
   }
 
   // ─── Step 1: PLANNER — classifica intent + gera queries + keywords ───────
@@ -267,7 +273,7 @@ export async function POST(req: Request) {
       topKPerQuery: config.topKPerQuery,
       topKLexical: config.topKLexical,
       maxTotalResults: config.maxTotalResults,
-      bookId: bookIdFilter,
+      bookIds: bookIdsFilter,
     });
   }
   logChatEvent({
@@ -334,7 +340,7 @@ export async function POST(req: Request) {
         elapsed_ms: synthesizerElapsed,
       });
 
-      if (userId && resolvedConversationId) {
+      if (userId && resolvedConversationId && text.trim().length > 0) {
         const snapshot: PipelineSnapshot = {
           question: lastUserMessage.content,
           needs_search: needsSearch,
@@ -366,6 +372,15 @@ export async function POST(req: Request) {
         setSnapshot(assistantMessageId, snapshot);
 
         try {
+          // Se for conversa nova, cria agora (após IA responder com sucesso).
+          // Isso evita conversas vazias no histórico quando a IA falha.
+          if (pendingConversationId) {
+            const title = lastUserMessage.content.slice(0, 60);
+            await db
+              .insert(conversations)
+              .values({ id: pendingConversationId, userId, title });
+          }
+
           await db.insert(messages).values([
             {
               conversationId: resolvedConversationId,
