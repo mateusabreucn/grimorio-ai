@@ -10,30 +10,86 @@ interface MessageBubbleProps {
   content: string
   onReload?: () => void
   isLast?: boolean
+  userName?: string
+  createdAt?: Date
+  messageId?: string
+  isLoggedIn?: boolean
 }
 
-export function MessageBubble({ role, content, onReload, isLast }: MessageBubbleProps) {
+function formatTime(date?: Date): string {
+  if (!date) return "agora"
+  return date.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })
+}
+
+export function MessageBubble({
+  role,
+  content,
+  onReload,
+  isLast,
+  userName,
+  createdAt,
+  messageId,
+  isLoggedIn,
+}: MessageBubbleProps) {
   const isUser = role === "user"
   const { toast } = useToast()
   const [copied, setCopied] = useState(false)
+  const [vote, setVote] = useState<"up" | "down" | null>(null)
+  const [votingFor, setVotingFor] = useState<"up" | "down" | null>(null)
+  const [showCommentBox, setShowCommentBox] = useState(false)
+  const [comment, setComment] = useState("")
 
   const handleCopy = async () => {
     try {
       await navigator.clipboard.writeText(content)
       setCopied(true)
-      toast({
-        title: "Texto copiado",
-        description: "A mensagem foi copiada para a área de transferência.",
-      })
+      toast({ title: "Texto copiado", description: "A mensagem foi copiada para a área de transferência." })
       setTimeout(() => setCopied(false), 2000)
-    } catch (err) {
-      toast({
-        title: "Erro ao copiar",
-        description: "Não foi possível copiar o texto.",
-        variant: "destructive",
-      })
+    } catch {
+      toast({ title: "Erro ao copiar", description: "Não foi possível copiar o texto.", variant: "destructive" })
     }
   }
+
+  const sendFeedback = async (v: "up" | "down", c?: string) => {
+    if (!messageId) return
+    setVotingFor(v)
+    try {
+      const res = await fetch("/api/chat/feedback", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ messageId, vote: v, comment: c }),
+      })
+      if (res.ok) {
+        setVote(v)
+        setShowCommentBox(false)
+        setComment("")
+        toast({ title: v === "up" ? "Obrigado pelo voto!" : "Feedback enviado", description: "Voto registrado com sucesso." })
+      } else if (res.status === 401) {
+        toast({ title: "Faça login", description: "É preciso estar logado para avaliar.", variant: "destructive" })
+      } else {
+        toast({ title: "Erro ao registrar", description: "Tente novamente em instantes.", variant: "destructive" })
+      }
+    } catch {
+      toast({ title: "Erro de rede", description: "Não foi possível enviar o feedback.", variant: "destructive" })
+    } finally {
+      setVotingFor(null)
+    }
+  }
+
+  const handleThumbsUp = () => {
+    if (vote === "up") return
+    setShowCommentBox(false)
+    sendFeedback("up")
+  }
+
+  const handleThumbsDown = () => {
+    if (vote === "down") return
+    setShowCommentBox((v) => !v)
+  }
+
+  const submitDownvote = () => sendFeedback("down", comment.trim() || undefined)
+
+  const displayName = userName || "Você"
 
   return (
     <div className={cn("mx-auto flex w-full max-w-6xl gap-3 px-2 py-3 md:gap-4 md:px-6 md:py-5", isUser && "justify-end")}>
@@ -53,7 +109,7 @@ export function MessageBubble({ role, content, onReload, isLast }: MessageBubble
             <div className="whitespace-pre-wrap break-words">{content}</div>
           </div>
           <div className="font-rune mt-2 text-right text-[0.68rem] uppercase tracking-[0.22em] text-[hsl(var(--ink-faint))]">
-            Velloran · agora
+            {displayName} · {formatTime(createdAt)}
           </div>
         </div>
       ) : (
@@ -81,7 +137,7 @@ export function MessageBubble({ role, content, onReload, isLast }: MessageBubble
                 Regenerar
               </button>
             )}
-            
+
             <button
               onClick={handleCopy}
               className="flex items-center gap-2 rounded-lg px-3 py-2 transition-colors hover:bg-[hsl(var(--panel-raised))] hover:text-foreground"
@@ -93,7 +149,7 @@ export function MessageBubble({ role, content, onReload, isLast }: MessageBubble
               )}
               {copied ? "Copiado" : "Copiar"}
             </button>
-            
+
             <button
               disabled
               className="flex items-center gap-2 rounded-lg px-3 py-2 opacity-50 cursor-not-allowed"
@@ -102,15 +158,71 @@ export function MessageBubble({ role, content, onReload, isLast }: MessageBubble
               <Save className="h-3.5 w-3.5 text-muted-foreground" />
               Salvar no Journal
             </button>
-            
-            <div className="flex-1" />
-            <button className="rounded-lg border border-border/70 p-2 transition-colors hover:border-primary/45 hover:text-foreground">
-              <ThumbsUp className="h-4 w-4" />
-            </button>
-            <button className="rounded-lg border border-border/70 p-2 transition-colors hover:border-primary/45 hover:text-foreground">
-              <ThumbsDown className="h-4 w-4" />
-            </button>
+
+            {isLoggedIn && messageId && (
+              <>
+                <div className="flex-1" />
+                <button
+                  onClick={handleThumbsUp}
+                  disabled={!!votingFor}
+                  className={cn(
+                    "rounded-lg border p-2 transition-colors",
+                    vote === "up"
+                      ? "border-green-500/60 bg-green-500/10 text-green-500"
+                      : "border-border/70 hover:border-primary/45 hover:text-foreground",
+                    votingFor && "opacity-50 cursor-not-allowed",
+                  )}
+                  title="Boa resposta"
+                >
+                  <ThumbsUp className="h-4 w-4" />
+                </button>
+                <button
+                  onClick={handleThumbsDown}
+                  disabled={!!votingFor}
+                  className={cn(
+                    "rounded-lg border p-2 transition-colors",
+                    vote === "down"
+                      ? "border-destructive/60 bg-destructive/10 text-destructive"
+                      : showCommentBox
+                        ? "border-primary/45 text-foreground"
+                        : "border-border/70 hover:border-primary/45 hover:text-foreground",
+                    votingFor && "opacity-50 cursor-not-allowed",
+                  )}
+                  title="Resposta ruim"
+                >
+                  <ThumbsDown className="h-4 w-4" />
+                </button>
+              </>
+            )}
           </div>
+
+          {showCommentBox && (
+            <div className="mt-3 flex flex-col gap-2 rounded-xl border border-border/70 bg-[hsl(var(--panel-raised))] p-3 animate-in fade-in slide-in-from-bottom-2 duration-200">
+              <textarea
+                value={comment}
+                onChange={(e) => setComment(e.target.value)}
+                placeholder="O que estava errado? (opcional)"
+                maxLength={2000}
+                rows={2}
+                className="w-full resize-none rounded-lg border border-border/70 bg-background px-3 py-2 text-sm placeholder:text-muted-foreground/70 focus:outline-none focus:ring-1 focus:ring-primary/40"
+              />
+              <div className="flex gap-2 justify-end">
+                <button
+                  onClick={() => { setShowCommentBox(false); setComment("") }}
+                  className="rounded-lg px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={submitDownvote}
+                  disabled={!!votingFor}
+                  className="rounded-lg bg-destructive/10 border border-destructive/30 px-3 py-1.5 text-xs text-destructive transition-colors hover:bg-destructive/20 disabled:opacity-50"
+                >
+                  Enviar feedback
+                </button>
+              </div>
+            </div>
+          )}
         </article>
       )}
     </div>

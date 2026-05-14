@@ -1,11 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useChat } from "ai/react";
 import { MessageList } from "./message-list";
 import { ChatInput } from "./chat-input";
-import { BookOpen, Sparkles } from "lucide-react";
+import { Sparkles } from "lucide-react";
 import { HeaderUserMenu } from "@/components/shared/header-user-menu";
+import type { Message } from "ai";
+
+type BookId = "core" | "herois" | "ameacas" | "deuses";
 
 interface InitialMessage {
   id: string;
@@ -25,9 +28,19 @@ interface ChatInterfaceProps {
 }
 
 export function ChatInterface({ conversationId, title: initialTitle, initialMessages = [], user }: ChatInterfaceProps) {
-  const [supplementsEnabled, setSupplementsEnabled] = useState(true);
+  const [selectedBooks, setSelectedBooks] = useState<BookId[]>(["core"]);
   const [activeConversationId, setActiveConversationId] = useState(conversationId);
   const [displayTitle, setDisplayTitle] = useState(initialTitle || "Nova consulta");
+
+  // Mapeia SDK message ID → backend message ID (para feedback)
+  const [backendIds, setBackendIds] = useState<Map<string, string>>(() => {
+    const map = new Map<string, string>();
+    for (const msg of initialMessages) {
+      if (msg.role === "assistant") map.set(msg.id, msg.id);
+    }
+    return map;
+  });
+  const pendingBackendIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     setActiveConversationId(conversationId);
@@ -38,25 +51,32 @@ export function ChatInterface({ conversationId, title: initialTitle, initialMess
     initialMessages,
     body: {
       conversationId: activeConversationId,
-      supplementsEnabled,
+      selectedBooks,
     },
     onResponse(response) {
-      const createdConversationId = response.headers.get("x-conversation-id");
+      const newConvId = response.headers.get("x-conversation-id");
+      if (!activeConversationId && newConvId) {
+        setActiveConversationId(newConvId);
+        window.history.replaceState(null, "", `/chat/${newConvId}`);
+      }
 
-      if (!activeConversationId && createdConversationId) {
-        setActiveConversationId(createdConversationId);
-        window.history.replaceState(null, "", `/chat/${createdConversationId}`);
+      const assistantId = response.headers.get("x-assistant-message-id");
+      if (assistantId) pendingBackendIdRef.current = assistantId;
+    },
+    onFinish(message: Message) {
+      if (pendingBackendIdRef.current && message.role === "assistant") {
+        const backendId = pendingBackendIdRef.current;
+        setBackendIds((prev) => new Map(prev).set(message.id, backendId));
+        pendingBackendIdRef.current = null;
       }
     },
   });
 
-  // Atualiza o título dinamicamente baseado na primeira mensagem do usuário se estiver vazio
   useEffect(() => {
     if (displayTitle === "Nova consulta" || !displayTitle) {
       const firstUserMessage = messages.find((m) => m.role === "user");
       if (firstUserMessage) {
-        const newTitle = firstUserMessage.content.slice(0, 60);
-        setDisplayTitle(newTitle);
+        setDisplayTitle(firstUserMessage.content.slice(0, 60));
       }
     }
   }, [messages, displayTitle]);
@@ -72,7 +92,7 @@ export function ChatInterface({ conversationId, title: initialTitle, initialMess
             <span className="h-1 w-1 rotate-45 bg-primary" />
             <span className="truncate text-[hsl(var(--ink-faint))]">Grimório AI</span>
           </div>
-          <h1 
+          <h1
             key={displayTitle}
             className="font-display max-w-3xl truncate text-lg font-semibold uppercase leading-tight tracking-[0.04em] text-foreground md:text-2xl animate-in fade-in slide-in-from-left-4 duration-500"
           >
@@ -88,11 +108,14 @@ export function ChatInterface({ conversationId, title: initialTitle, initialMess
       </header>
 
       <div className="relative flex-1 overflow-y-auto scrollbar-elegant scrollbar-track-transparent">
-        <MessageList 
-          messages={messages} 
-          isLoading={isLoading} 
+        <MessageList
+          messages={messages}
+          isLoading={isLoading}
           onCardClick={(text) => setInput(text)}
           onReload={() => reload()}
+          userName={user?.name ?? undefined}
+          backendIds={backendIds}
+          isLoggedIn={!!user}
         />
       </div>
 
@@ -115,8 +138,8 @@ export function ChatInterface({ conversationId, title: initialTitle, initialMess
         isLoading={isLoading}
         onInputChange={setInput}
         onSubmit={handleSubmit}
-        supplementsEnabled={supplementsEnabled}
-        onSupplementsToggle={setSupplementsEnabled}
+        selectedBooks={selectedBooks}
+        onBooksChange={setSelectedBooks}
       />
     </div>
   );

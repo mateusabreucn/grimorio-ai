@@ -8,6 +8,7 @@ interface ChatMessage {
   id: string
   role: "user" | "assistant" | string
   content: string
+  createdAt?: Date
 }
 
 interface MessageListProps {
@@ -15,9 +16,20 @@ interface MessageListProps {
   isLoading: boolean
   onCardClick?: (text: string) => void
   onReload?: () => void
+  userName?: string
+  backendIds?: Map<string, string>
+  isLoggedIn?: boolean
 }
 
-export function MessageList({ messages, isLoading, onCardClick, onReload }: MessageListProps) {
+export function MessageList({
+  messages,
+  isLoading,
+  onCardClick,
+  onReload,
+  userName,
+  backendIds,
+  isLoggedIn,
+}: MessageListProps) {
   const bottomRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -75,6 +87,10 @@ export function MessageList({ messages, isLoading, onCardClick, onReload }: Mess
           content={msg.content}
           isLast={index === messages.length - 1}
           onReload={onReload}
+          userName={userName}
+          createdAt={msg.createdAt}
+          messageId={backendIds?.get(msg.id)}
+          isLoggedIn={isLoggedIn}
         />
       ))}
 
